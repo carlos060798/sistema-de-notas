@@ -2,11 +2,11 @@
 id: 2026-10-31-nucleo-notas-y-respaldo
 titulo: "Notas, planes de área y de aula, avance de temas, respaldo y Excel (primaria, grados 0 a 5)"
 tamano: grande
-estado: borrador
+estado: aprobada
 creada: 2026-10-31
 actualizada: 2026-10-31
 autor: humano
-constitucion_version: 0.1.0
+constitucion_version: 1.0.0
 etiquetas: [notas, planeacion, respaldo, excel, primaria]
 ---
 
@@ -91,7 +91,7 @@ Un programa portable, sin conexión, donde el docente:
 **Como** docente **quiero** expedir planillas, boletines y certificados **para** entregarlos a los acudientes y a la institución.
 - [ ] **CA-009-01**: Planilla de notas por grado, materia y periodo en `.xlsx` y `.pdf`. (P1)
 - [ ] **CA-009-02**: Boletín individual con notas, definitiva, nivelación y observaciones, en `.pdf` y `.docx`. (P1)
-- [ ] **CA-009-03**: Certificado de notas por año, en `.pdf` y `.docx`, con los datos de la institución configurables. (P2)
+- [ ] **CA-009-03**: Certificado de notas por año, en `.pdf` y `.docx`, con encabezado institucional opcional y configurable. (P2)
 - [ ] **CA-009-04**: Tildes y eñes se ven bien en todos los formatos. (P1)
 
 ## 5. Escenarios
@@ -119,16 +119,15 @@ Un programa portable, sin conexión, donde el docente:
 ## 8. Fuera de alcance
 Sincronización en la nube, varios usuarios, aplicación móvil, envío de boletines por correo.
 
-## 9. Decisiones del docente (2026-10-31) y preguntas abiertas
+## 9. Decisiones del docente (2026-10-31)
 
-Decididas:
 - 4 periodos al año; tres notas por periodo; la definitiva del periodo es la suma de las tres dividida entre tres.
+- La definitiva del año por materia es el promedio simple de los 4 periodos (todos pesan lo mismo).
 - Escala de 1,0 a 5,0; aprueba con 3,0 o más; menos de 3,0 es desaprobado.
 - Multigrado: grados 0 a 5 a la vez.
+- Equipo: portátil ASUS con Windows 10 y disco de 2 TB.
+- Sin niveles Superior/Alto/Básico/Bajo y sin clave de acceso (valores por defecto aceptados; ambos quedan como opción futura).
+- Certificados y boletines: el encabezado institucional es opcional y se deja abierto por ahora; el uso es personal, no entregable a terceros. Los datos (nombre, sede, DANE, logo) se pueden configurar después.
 
-Abiertas:
-1. ¿Qué versión de Windows tiene el ASUS (10 u 11)? Para verlo: tecla Windows + R, escribir `winver`.
-2. La definitiva del año por materia: ¿es el promedio simple de los 4 periodos, o los periodos pesan distinto? Por defecto, promedio simple.
-3. ¿Qué datos de la institución van en el encabezado de boletines y certificados (nombre, sede, código DANE, logo)?
-4. ¿La institución exige además los niveles Superior, Alto, Básico y Bajo en el boletín? Por defecto, no.
-5. ¿Quiere proteger el acceso con una clave? Por defecto, no.
+## 10. Preguntas abiertas
+Ninguna que bloquee el Sprint 0.

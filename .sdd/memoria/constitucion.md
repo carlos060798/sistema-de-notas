@@ -1,6 +1,6 @@
 # Constitución del Proyecto: Sistema de notas rural
 
-> **Versión:** 0.1.0 (borrador) | **Ratificada:** pendiente | **Última enmienda:** 2026-10-31
+> **Versión:** 1.0.0 | **Ratificada:** 2026-10-31 (por el dueño) | **Última enmienda:** 2026-10-31
 
 ## Propósito y misión
 
@@ -60,4 +60,4 @@ Cada dependencia nueva DEBE justificarse en un ADR (licencia, tamaño, mantenimi
 
 ## Gobierno
 
-Las enmiendas se registran con versión semántica. Mientras esté en borrador, la constitución no obliga hasta que el dueño la ratifique.
+Las enmiendas se registran con versión semántica. Ratificada por el dueño el 2026-10-31.
