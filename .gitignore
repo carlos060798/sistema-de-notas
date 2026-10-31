@@ -6,3 +6,5 @@ dist/
 respaldos/
 .env
 .claude/settings.local.json
+spikes/**/*.exe
+spikes/**/*.blob
