@@ -18,10 +18,13 @@
 - [x] **T2.5** Importar con validación, resumen previo y transacción única. Cubre CA-008-02 a 04. Hecho 2026-10-31.
 
 ## F3 Notas y nivelación
-- [ ] **T3.1** Servidor local con token. Cubre RF-003 (prueba: no escucha fuera de 127.0.0.1).
-- [ ] **T3.2** Grados, materias y estudiantes. Cubre CA-001-01 a 04.
-- [ ] **T3.3** Pantalla de notas, desaprobadas resaltadas. Cubre CA-002-04.
-- [ ] **T3.4** Plan de nivelación y listado pendiente. Cubre CA-003-01 a 03.
+- [x] **T3.1** Servidor local con token. Cubre RF-003 (prueba: no escucha fuera de 127.0.0.1). Hecho 2026-10-31.
+- [x] **T3.2** Grados, materias y estudiantes. Cubre CA-001-01 a 04. Hecho 2026-10-31.
+- [x] **T3.3** Pantalla de notas, desaprobadas resaltadas. Cubre CA-002-04. Hecho 2026-10-31.
+- [x] **T3.4** Plan de nivelación y listado pendiente. Cubre CA-003-01 a 03. Hecho 2026-10-31.
+
+- [x] **T3.5** Respaldo y Excel en la interfaz (crear copia, restaurar, descargar Excel, revisar e importar con resumen) y pantalla de recuperación si la base está dañada. Cubre CA-007-03, CA-008-01 a 04 desde la pantalla. Hecho 2026-10-31.
+- [x] **T3.6** Arranque: instancia única, copia al abrir y al cerrar, apagado al cerrar la ventana, apertura en ventana de aplicación. Cubre CA-007-01. Hecho 2026-10-31.
 
 ## F4 Planes, guías y avance
 - [ ] **T4.1** Plan de área y plan de aula. Cubre CA-004-01 a 03.

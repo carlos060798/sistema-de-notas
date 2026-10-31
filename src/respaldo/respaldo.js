@@ -49,15 +49,15 @@ export function listarCopias(carpeta) {
 }
 
 /**
- * Borra las copias automáticas sobrantes (deja las `n` más nuevas) y las de «antes de restaurar»
- * por encima del tope. Las manuales no se borran nunca.
+ * Borra las copias automáticas sobrantes (deja las `n` más nuevas) y las de «antes de restaurar» o
+ * «antes de importar» por encima del tope. Las manuales no se borran nunca.
  * @param {string} carpeta @param {number} n
  */
 export function aplicarRetencion(carpeta, n) {
   const copias = listarCopias(carpeta);
   const sobrantes = [
     ...copias.filter((c) => AUTOMATICOS.has(c.motivo)).slice(n),
-    ...copias.filter((c) => c.motivo === 'antes-de-restaurar').slice(MAX_ANTES_DE_RESTAURAR),
+    ...copias.filter((c) => c.motivo.startsWith('antes-de-')).slice(MAX_ANTES_DE_RESTAURAR),
   ];
   for (const c of sobrantes) fs.rmSync(c.ruta, { force: true });
 }
@@ -117,7 +117,7 @@ export function diagnosticar(rutaBase, carpetaCopias) {
   if (!fs.existsSync(rutaBase)) return { estado: 'nueva' };
   const v = verificarCopia(rutaBase);
   if (v.ok) return { estado: 'ok' };
-  const sana = listarCopias(carpetaCopias).find((c) => c.motivo !== 'antes-de-restaurar' && verificarCopia(c.ruta).ok);
+  const sana = listarCopias(carpetaCopias).find((c) => !c.motivo.startsWith('antes-de-') && verificarCopia(c.ruta).ok);
   return { estado: 'danada', motivo: v.motivo, copiaSana: sana ? sana.ruta : null };
 }
 
