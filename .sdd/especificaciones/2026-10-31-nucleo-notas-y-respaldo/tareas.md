@@ -11,11 +11,11 @@
 - [x] **T1.3** Migraciones y esquema v1 con transacciones. Cubre RF-002, RF-004. Hecho 2026-10-31: 10 pruebas (migraciones, rangos, claves foráneas, transacciones).
 
 ## F2 Respaldo y Excel
-- [ ] **T2.1** Copia automática al abrir y cerrar, retención de N. Cubre CA-007-01.
-- [ ] **T2.2** Verificar y restaurar con copia previa; oferta al detectar daño. Cubre CA-007-02 a 04.
-- [ ] **T2.3** Copia en carpeta adicional (USB). Cubre CA-007-05.
-- [ ] **T2.4** Exportar a `.xlsx` con `_version`. Cubre CA-008-01.
-- [ ] **T2.5** Importar con validación, resumen previo y transacción única. Cubre CA-008-02 a 04.
+- [x] **T2.1** Copia automática al abrir y cerrar, retención de N. Cubre CA-007-01. Hecho 2026-10-31.
+- [x] **T2.2** Verificar y restaurar con copia previa; oferta al detectar daño. Cubre CA-007-02 a 04. Hecho 2026-10-31.
+- [x] **T2.3** Copia en carpeta adicional (USB). Cubre CA-007-05. Hecho 2026-10-31.
+- [x] **T2.4** Exportar a `.xlsx` con `_version`. Cubre CA-008-01. Hecho 2026-10-31.
+- [x] **T2.5** Importar con validación, resumen previo y transacción única. Cubre CA-008-02 a 04. Hecho 2026-10-31.
 
 ## F3 Notas y nivelación
 - [ ] **T3.1** Servidor local con token. Cubre RF-003 (prueba: no escucha fuera de 127.0.0.1).

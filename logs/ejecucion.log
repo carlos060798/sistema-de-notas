@@ -13,3 +13,5 @@
 2026-10-31T21:19:58Z | sprint0 | aviso | Sin comprobar: aspecto visual de PDF/Word, peso del exe empaquetado, prueba en el ASUS, redondeo de notas
 2026-10-31T21:25:40Z | F1 | ok | Dominio de notas (17 pruebas) y capa de datos con migraciones (10 pruebas): 27 pasan, tipos en 0
 2026-10-31T21:25:40Z | F1 | aviso | Decisiones por defecto a validar con el docente: redondeo mitad hacia arriba; aprobacion sobre valor redondeado; notas con hasta 2 decimales
+2026-10-31T21:35:28Z | F2 | ok | Respaldo (17 pruebas) y Excel de ida y vuelta (14 pruebas): 58 pasan en total, tipos en 0; 3 mutaciones detectadas
+2026-10-31T21:35:29Z | F2 | aviso | Pendiente: adjuntos en respaldo/Excel (F4); revision independiente de rutas y Excel hostil; probar con volumen real
