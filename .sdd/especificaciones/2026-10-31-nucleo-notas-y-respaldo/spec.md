@@ -35,14 +35,16 @@ Un programa portable, sin conexión, donde el docente:
 - [ ] **CA-001-01**: Los grados disponibles son 0, 1, 2, 3, 4 y 5; las materias se crean y editan por grado. (P1)
 - [ ] **CA-001-02**: Se crean, editan y archivan estudiantes; archivar no borra su historial. (P1)
 - [ ] **CA-001-03**: Hay varios años lectivos; un año cerrado queda de solo lectura. (P2)
+- [ ] **CA-001-04**: El sistema es multigrado: el docente atiende los grados 0 a 5 a la vez y todas las vistas (notas, planes, avance) se filtran por grado sin cambiar de año ni de base. (P1)
 
 ### HU-002: Notas con escala de 1,0 a 5,0
 **Como** docente **quiero** registrar nota 1, nota 2, nota 3 y la definitiva por estudiante y materia **para** saber quién aprueba.
 - [ ] **CA-002-01**: La escala es de 1,0 a 5,0; una nota fuera de rango se rechaza con un mensaje claro. (P1)
 - [ ] **CA-002-02**: La aprobación es 3,0 o más; menos de 3,0 es desaprobado. El umbral es configurable y por defecto vale 3,0. (P1)
-- [ ] **CA-002-03**: La definitiva se calcula con la regla configurada (por defecto, promedio de las notas registradas) y se muestra igual en pantalla, Excel y PDF. (P1)
+- [ ] **CA-002-03**: En cada periodo, la definitiva es (nota 1 + nota 2 + nota 3) / 3, redondeada a un decimal, y se muestra igual en pantalla, Excel y PDF. Si falta alguna nota, la definitiva del periodo queda «incompleta» y no se calcula. (P1)
 - [ ] **CA-002-04**: Las notas desaprobadas se resaltan y se listan por grado y materia. (P1)
-- [ ] **CA-002-05**: El número de notas por materia es configurable; por defecto son tres más la definitiva. (P2)
+- [ ] **CA-002-05**: Hay 4 periodos por año; cada uno tiene tres notas y su definitiva. (P1)
+- [ ] **CA-002-06**: La definitiva del año por materia se calcula a partir de los 4 periodos (regla por confirmar, ver pregunta 2). (P1)
 
 ### HU-003: Plan de nivelación
 **Como** docente **quiero** un plan de nivelación para cada estudiante desaprobado **para** darle una segunda oportunidad documentada.
@@ -117,11 +119,16 @@ Un programa portable, sin conexión, donde el docente:
 ## 8. Fuera de alcance
 Sincronización en la nube, varios usuarios, aplicación móvil, envío de boletines por correo.
 
-## 9. Preguntas abiertas
-1. ¿Qué versión de Windows tiene el ASUS (10 u 11)? Con 10 u 11 sirve la opción A del ADR-01.
-2. «Nota 1, 2, 3 y definitiva»: ¿son tres periodos del año, con la definitiva como promedio, o tres notas dentro de cada periodo? Lo dejé configurable, con tres notas por defecto.
-3. ¿La definitiva es el promedio simple o cada nota tiene un peso distinto?
-4. ¿La institución exige además los niveles Superior, Alto, Básico y Bajo en el boletín? Lo dejo como opción.
-5. ¿Qué datos de la institución van en el encabezado de boletines y certificados (nombre, sede, DANE, logo)?
-6. ¿Atiende todos los grados a la vez (multigrado) o un grado por año?
-7. ¿Necesita proteger el acceso con una clave?
+## 9. Decisiones del docente (2026-10-31) y preguntas abiertas
+
+Decididas:
+- 4 periodos al año; tres notas por periodo; la definitiva del periodo es la suma de las tres dividida entre tres.
+- Escala de 1,0 a 5,0; aprueba con 3,0 o más; menos de 3,0 es desaprobado.
+- Multigrado: grados 0 a 5 a la vez.
+
+Abiertas:
+1. ¿Qué versión de Windows tiene el ASUS (10 u 11)? Para verlo: tecla Windows + R, escribir `winver`.
+2. La definitiva del año por materia: ¿es el promedio simple de los 4 periodos, o los periodos pesan distinto? Por defecto, promedio simple.
+3. ¿Qué datos de la institución van en el encabezado de boletines y certificados (nombre, sede, código DANE, logo)?
+4. ¿La institución exige además los niveles Superior, Alto, Básico y Bajo en el boletín? Por defecto, no.
+5. ¿Quiere proteger el acceso con una clave? Por defecto, no.
