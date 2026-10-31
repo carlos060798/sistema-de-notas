@@ -1,0 +1,40 @@
+# Tareas
+
+## F0 Sprint 0
+- [x] **T0.1** Constitución 1.0.0, spec aprobada, ADR-01 aceptada.
+- [x] **T0.2** Spikes S0.1 a S0.4 (sin la prueba visual de PDF/Word ni la del ASUS).
+- [ ] **T0.3** Revisión independiente de la spec y del plan.
+
+## F1 Dominio y datos
+- [ ] **T1.1** `package.json`, `tsconfig` (`checkJs`), `node:test`. Prueba: `npm test` y `tsc` en 0.
+- [ ] **T1.2** Dominio de notas con pruebas primero: casos 2,9 / 3,0 / 5,0, incompleta, redondeo. Cubre CA-002-01 a 06.
+- [ ] **T1.3** Migraciones y esquema v1 con transacciones. Cubre RF-002, RF-004.
+
+## F2 Respaldo y Excel
+- [ ] **T2.1** Copia automática al abrir y cerrar, retención de N. Cubre CA-007-01.
+- [ ] **T2.2** Verificar y restaurar con copia previa; oferta al detectar daño. Cubre CA-007-02 a 04.
+- [ ] **T2.3** Copia en carpeta adicional (USB). Cubre CA-007-05.
+- [ ] **T2.4** Exportar a `.xlsx` con `_version`. Cubre CA-008-01.
+- [ ] **T2.5** Importar con validación, resumen previo y transacción única. Cubre CA-008-02 a 04.
+
+## F3 Notas y nivelación
+- [ ] **T3.1** Servidor local con token. Cubre RF-003 (prueba: no escucha fuera de 127.0.0.1).
+- [ ] **T3.2** Grados, materias y estudiantes. Cubre CA-001-01 a 04.
+- [ ] **T3.3** Pantalla de notas, desaprobadas resaltadas. Cubre CA-002-04.
+- [ ] **T3.4** Plan de nivelación y listado pendiente. Cubre CA-003-01 a 03.
+
+## F4 Planes, guías y avance
+- [ ] **T4.1** Plan de área y plan de aula. Cubre CA-004-01 a 03.
+- [ ] **T4.2** Guías con adjuntos en `datos/`. Cubre CA-005-01, 02, RF-005.
+- [ ] **T4.3** Temas, avance y clases. Cubre CA-006-01 a 04.
+
+## F5 Reportes
+- [ ] **T5.1** Planilla en `.xlsx` y `.pdf`. Cubre CA-009-01.
+- [ ] **T5.2** Boletín y certificado en `.pdf` y `.docx`. Cubre CA-009-02 a 04.
+- [ ] **T5.3** Planes y guías a Word y PDF. Cubre CA-004-04, CA-005-03.
+
+## F6 Empaquetado y cierre
+- [ ] **T6.1** `esbuild` + SEA + GitHub Actions que publica el `.exe`.
+- [ ] **T6.2** Prueba en el ASUS con Windows 10: arranque, memoria, restauración.
+- [ ] **T6.3** Prueba visual de PDF y Word.
+- [ ] **T6.4** Revisión independiente, suite completa, `verificacion.md`.

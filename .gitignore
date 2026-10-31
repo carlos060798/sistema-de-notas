@@ -8,3 +8,4 @@ respaldos/
 .claude/settings.local.json
 spikes/**/*.exe
 spikes/**/*.blob
+spikes/s02-formatos/salida/

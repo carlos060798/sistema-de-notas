@@ -1,6 +1,6 @@
 # ADR-01: Pila portable sin conexión
 
-> Estado: propuesta
+> Estado: aceptada (por delegación del dueño, 2026-10-31; pendiente la prueba en el ASUS y la medición de memoria)
 > Fecha: 2026-10-31
 > Spec relacionada: 2026-10-31-nucleo-notas-y-respaldo
 > Autor: agente (pendiente de aprobación del dueño)
