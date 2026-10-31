@@ -1,0 +1,18 @@
+{
+  "name": "sistema-de-notas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema de notas portable y sin conexión para un docente de primaria rural",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

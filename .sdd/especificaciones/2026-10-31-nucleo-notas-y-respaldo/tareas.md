@@ -6,9 +6,9 @@
 - [ ] **T0.3** Revisión independiente de la spec y del plan.
 
 ## F1 Dominio y datos
-- [ ] **T1.1** `package.json`, `tsconfig` (`checkJs`), `node:test`. Prueba: `npm test` y `tsc` en 0.
-- [ ] **T1.2** Dominio de notas con pruebas primero: casos 2,9 / 3,0 / 5,0, incompleta, redondeo. Cubre CA-002-01 a 06.
-- [ ] **T1.3** Migraciones y esquema v1 con transacciones. Cubre RF-002, RF-004.
+- [x] **T1.1** `package.json`, `tsconfig` (`checkJs`), `node:test`. Prueba: `npm test` y `tsc` en 0. Hecho 2026-10-31.
+- [x] **T1.2** Dominio de notas con pruebas primero: casos 2,9 / 3,0 / 5,0, incompleta, redondeo. Cubre CA-002-01 a 06. Hecho 2026-10-31: 17 pruebas.
+- [x] **T1.3** Migraciones y esquema v1 con transacciones. Cubre RF-002, RF-004. Hecho 2026-10-31: 10 pruebas (migraciones, rangos, claves foráneas, transacciones).
 
 ## F2 Respaldo y Excel
 - [ ] **T2.1** Copia automática al abrir y cerrar, retención de N. Cubre CA-007-01.

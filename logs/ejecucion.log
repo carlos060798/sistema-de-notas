@@ -11,3 +11,5 @@
 2026-10-31T21:11:38Z | sprint0 | ok | Spike S0.1: exe SEA de 89 MB con node:sqlite y servidor local funcionando; falta probar en el ASUS y medir memoria
 2026-10-31T21:19:58Z | sprint0 | ok | Spikes S0.2 a S0.4 pasan (Excel ida y vuelta identico, PDF y DOCX validos, respaldo con adjuntos y deteccion de dano); ADR-01 aceptada; plan y tareas generados
 2026-10-31T21:19:58Z | sprint0 | aviso | Sin comprobar: aspecto visual de PDF/Word, peso del exe empaquetado, prueba en el ASUS, redondeo de notas
+2026-10-31T21:25:40Z | F1 | ok | Dominio de notas (17 pruebas) y capa de datos con migraciones (10 pruebas): 27 pasan, tipos en 0
+2026-10-31T21:25:40Z | F1 | aviso | Decisiones por defecto a validar con el docente: redondeo mitad hacia arriba; aprobacion sobre valor redondeado; notas con hasta 2 decimales
