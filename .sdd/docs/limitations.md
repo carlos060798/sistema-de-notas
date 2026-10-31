@@ -1,0 +1,176 @@
+# Limitaciones
+
+Este documento describe las limitaciones conocidas de FORGE: restricciones inherentes al diseño, compromisos deliberados, áreas incompletas y casos donde FORGE no es la herramienta adecuada.
+
+---
+
+## Limitaciones de diseño (por decisión)
+
+### FORGE no es independiente de Claude Code
+
+Las sesiones interactivas y los agentes en forma de comandos corren dentro de Claude Code. Desde 5.0.0 existen `forge api` (API HTTP local con token) y `forge mcp` (servidor MCP por stdin/stdout), y `forge run` puede lanzarse desde la terminal sin sesión de Claude Code; los agentes siguen necesitando un proveedor de modelo y las sesiones interactivas corren dentro de Claude Code.
+
+**Por qué:** Esta decisión mantiene FORGE extremadamente ligero (tres dependencias npm) y elimina la fricción de instalación. La contrapartida es que el flujo interactivo completo necesita Claude Code; el ciclo verificado (`forge run`) sí puede lanzarse en un pipeline, con Docker y un proveedor de modelo.
+
+---
+
+### Los agentes son prompts, no procesos
+
+Los 14 agentes de FORGE son archivos Markdown con instrucciones de rol. No son procesos separados, no tienen estado de ejecución propio y no pueden comunicarse entre sí directamente — solo a través de artefactos en `.sdd/`.
+
+**Consecuencia práctica:** No existe una garantía de que el agente siga sus instrucciones al 100% en todos los casos. Un agente puede desviarse del rol si el contexto de la conversación lo lleva en otra dirección. Los hooks de governance (`pre-tool-guard`, `post-write-conventions`) mitigan esto para operaciones de escritura, pero no para el razonamiento del agente.
+
+---
+
+### Sin ejecución paralela real dentro de una sesión
+
+La herramienta `Task` de Claude Code permite despachar subagentes, pero dentro de una sesión de Claude Code la ejecución es fundamentalmente secuencial en el nivel de la sesión principal. El Programmatic Tool Calling (PTC) paraleliza al nivel de subagentes, pero el agente principal espera a que todos completen.
+
+**Consecuencia práctica:** En proyectos muy grandes con muchas tareas independientes, el tiempo total de implementación puede ser largo aunque las tareas sean paralelizables en teoría.
+
+---
+
+### El modo multi-proveedor no ha sido validado exhaustivamente
+
+FORGE soporta OpenAI y Ollama como proveedores alternativos a Anthropic. Sin embargo, los tests de integración están escritos contra Anthropic (y el proveedor `stub` para CI). El comportamiento con GPT-4o u Ollama como proveedores de agentes de implementación puede variar respecto al comportamiento documentado.
+
+**Proveedores soportados:** anthropic, openai, ollama, stub. Google/Gemini no está soportado.
+
+**Recomendación:** Usar OpenAI/Ollama solo para agentes de nivel de implementación (`desarrollador-backend`, `desarrollador-frontend`, `tester`). Los agentes estratégicos usan Anthropic de forma fija.
+
+---
+
+## Limitaciones técnicas conocidas
+
+### La migración automática de Markdown a SQLite no está implementada
+
+Si cambias `memoria.backend` de `markdown` a `sqlite` en un proyecto existente, el historial de memoria en archivos `.md` no se migra al backend SQLite. El sistema empieza con una memoria vacía.
+
+**Solución actual:** Si necesitas preservar el historial, no cambies el backend a mitad del proyecto. Cambia el backend solo en proyectos nuevos.
+
+---
+
+### Parte de las pruebas se omite según el equipo
+
+Ya no hay archivos `.skip` en `tests/`: los cinco que se listaban aquí (`agent-enforcement`, `ast-compressor`, `delta-encoding`, `episodic-memory`, `hybrid-indexer`) son hoy archivos de prueba activos.
+
+Lo que sí se omite depende del equipo. En la última pasada completa (commit `be747d6`, Windows 11, Node 24.20.0, sin `FORGE_TEST_DOCKER`), `npm test` ejecutó 3909 pruebas: 3877 pasaron, 1 falló (una prueba de tiempo en un disco lento) y 31 se omitieron. Las omisiones son las pruebas que piden Docker real (`FORGE_TEST_DOCKER=1`) o, en algunos casos, enlaces simbólicos de archivo. El registro de pasadas está en [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md).
+
+**Impacto:** lo que solo se comprueba con Docker real, con enlaces de archivo o en un sistema POSIX no queda cubierto por un `npm test` normal en Windows. La cobertura por archivo está en [COBERTURA.md](COBERTURA.md).
+
+---
+
+### `mcp-figma/` está incompleto
+
+El directorio `mcp-figma/` existe y tiene un `README.md` y `package.json`, pero el código fuente del servidor MCP de Figma está en estado esquelético.
+
+**Impacto:** La integración con Figma descrita en `sdd.config.yaml → figma` no funciona sin este MCP completamente implementado.
+
+**Alternativa actual:** La skill `elegir-direccion` y los design systems en `design-systems/` funcionan de forma independiente y no requieren Figma.
+
+---
+
+### Los presets no son activables como comando
+
+Los archivos en `presets/` (`lean.yaml`, `startup.yaml`, `enterprise.yaml`) son plantillas que se aplican durante `forge init --preset`. No existe un comando `/sdd.preset cargar startup` para cambiar el preset de un proyecto existente.
+
+**Alternativa actual:** Copiar manualmente las claves del preset que quieres aplicar en tu `sdd.config.yaml`, o usar `/sdd.configurar set` para cada valor.
+
+---
+
+### `cache-audit` no está conectado al pipeline automáticamente
+
+La skill `cache-audit` analiza oportunidades de `cache_control` en los archivos de memoria de agentes, pero no se invoca automáticamente en ningún punto del pipeline. Requiere invocación manual.
+
+---
+
+### El modo `prototipo` no es respetado completamente por todos los comandos
+
+Aunque `sesion.modo: prototipo` está declarado en `sdd.config.yaml` y los comandos principales (`sdd.planificar`, `sdd.especificar`) lo respetan, algunos comandos de mantenimiento no comprueban el modo de sesión y pueden ejecutar pasos que se supone deben omitirse.
+
+---
+
+### `orquestacion-ptc` requiere activación explícita
+
+La skill de paralelización con PTC no está activa por defecto en todos los contextos donde podría beneficiar. Requiere que el comando la invoque explícitamente o que el usuario tenga el flag correspondiente.
+
+---
+
+## Ejecución de código generado
+
+En el modo clásico (`--motor clasico` o `motor.modo: clasico`), `forge run` ejecuta las pruebas del proyecto **directamente en tu equipo**, sin aislamiento. Desde 5.0.0 no es el modo por defecto. El nivel `sandbox` del circuit breaker no es un aislamiento: solo deja de ejecutar tareas tras varios fallos.
+
+El aislamiento real existe solo en el ciclo verificado (el modo por defecto desde 5.0.0), que exige Docker. Sus propios límites están en [ciclo-verificado.md](ciclo-verificado.md#límites-conocidos).
+
+## Limitaciones de escala
+
+### Proyectos muy grandes pueden degradar el rendimiento de la memoria
+
+Con proyectos de más de ~500 archivos y sesiones largas, los archivos de memoria de agentes pueden crecer considerablemente incluso con compactación. El índice invertido (`indice.jsonl`) puede volverse lento para consultas complejas.
+
+**Solución:** Activar el backend SQLite (`memoria.backend: sqlite`) con Node ≥ 22.5 para proyectos grandes.
+
+---
+
+### El dashboard UI no escala para consumo.jsonl muy grandes
+
+El endpoint `/consumo` devuelve las últimas 50 líneas de `consumo.jsonl`. En proyectos con cientos de sesiones, el archivo puede ser grande, pero el dashboard siempre mostrará solo las 50 más recientes.
+
+**Impacto:** No hay impacto funcional — el archivo completo está disponible en disco para análisis externo.
+
+---
+
+## Casos donde FORGE no es adecuado
+
+### Proyectos sin Claude Code
+
+Si tu equipo no usa Claude Code como herramienta principal, FORGE no encaja. FORGE no tiene CLI propia para ejecutar el pipeline, servidor propio para recibir webhooks, ni SDK para integrar en otra herramienta de IA.
+
+---
+
+### Automatización de CI/CD sin intervención humana
+
+FORGE está diseñado para trabajo colaborativo humano-IA, no para pipelines completamente automatizados. Los puntos de aprobación (`requerir_aprobacion_plan: true`) son deliberados. Si necesitas una pipeline de CI que genere código completamente automático, FORGE no es la herramienta correcta.
+
+---
+
+### Tareas de mantenimiento puntual
+
+Para una tarea puntual de 5 minutos ("arregla este bug", "renombra esta función"), el overhead de FORGE (discovery → IR → spec → plan) es desproporcionado. Usa Claude Code directamente para tareas menores.
+
+FORGE es más valioso cuanto más compleja y duradera es la tarea: features nuevas, refactorizaciones grandes, nuevos módulos.
+
+---
+
+### Proyectos en producción sin especificación existente
+
+Si tienes un proyecto en producción bien establecido pero sin spec formal, el proceso de retroespecificación (escribir la spec a partir del código existente) puede ser más trabajo del que aporta. FORGE es más efectivo cuando la spec se crea junto con el producto.
+
+---
+
+## Deuda técnica visible
+
+Las siguientes áreas del código tienen TODOs o están marcadas como incompletas:
+
+| Área | Estado | Impacto |
+|------|--------|---------|
+| `mcp-figma/src/` | Esquelético | Integración Figma no funcional |
+| Pruebas que piden Docker, enlaces de archivo o permisos POSIX | Se omiten en Windows sin Docker (17 omisiones el 2026-10-10) | Esas rutas no las cubre un `npm test` normal: ver [COBERTURA.md](COBERTURA.md) |
+| Migración Markdown→SQLite | No implementada | Cambio de backend pierde historial |
+| `mcp-figma/src/` | Esquelético | Integración Figma no funcional |
+
+---
+
+## Convivencia con otras herramientas
+
+### Con GitHub Copilot / Cursor
+
+FORGE no interfiere con otras herramientas de IA en el editor. Los hooks de Claude Code solo se activan dentro de sesiones de Claude Code.
+
+### Con ESLint / Prettier
+
+`post-write-conventions.js` detecta convenciones de código del proyecto. Si tienes ESLint/Prettier configurados, FORGE los detectará y los respetará. No los ejecuta automáticamente — solo valida que el código generado siga las mismas reglas.
+
+### Con Git hooks
+
+Los hooks de Claude Code y los hooks de Git (pre-commit, etc.) son independientes. FORGE no interfiere con tus Git hooks existentes.

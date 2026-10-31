@@ -1,0 +1,470 @@
+# ============================================================
+# SDD-ES — Configuración del Plugin
+# ============================================================
+# Este archivo se copia a `.sdd/sdd.config.yaml` al inicializar.
+# Edítalo para personalizar el comportamiento del plugin.
+# ============================================================
+
+# IDIOMA — todos los artefactos generados estarán en este idioma
+idioma: español
+
+# ============================================================
+# LLM — Provider y modelo a usar para los agentes
+# ============================================================
+# provider: anthropic   → Claude (Anthropic API) — default
+#           openai      → GPT-4o / Codex / Azure / GitHub Models / Cursor
+#           ollama      → Modelos locales (llama3, deepseek, qwen, mistral…)
+#           stub        → Sin LLM — solo para tests y CI
+#
+# Variables de entorno alternativas (sin tocar este archivo):
+#   FORGE_LLM_PROVIDER=ollama
+#   FORGE_LLM_PROVIDER=openai  OPENAI_API_KEY=sk-...
+#   FORGE_LLM_PROVIDER=stub    (para CI)
+#
+# Ejemplos de config por provider:
+#
+#   # Anthropic (default — requiere ANTHROPIC_API_KEY)
+#   llm:
+#     provider: anthropic
+#     model: sonnet
+#
+#   # OpenAI  (la clave va en tu ENTORNO: OPENAI_API_KEY; un archivo del proyecto no puede traerla)
+#   llm:
+#     provider: openai
+#     model: gpt-4o
+#
+#   # GitHub Models / Azure (endpoint compatible con OpenAI)
+#   # El servidor lo fijas TÚ en tu entorno, no en el proyecto:
+#   #   OPENAI_BASE_URL=https://models.inference.ai.azure.com   (y la clave en OPENAI_API_KEY)
+#   # o lo permites por nombre:  FORGE_LLM_HOSTS=models.inference.ai.azure.com
+#   llm:
+#     provider: openai
+#     base_url: https://models.inference.ai.azure.com
+#     model: gpt-4o
+#
+#   # Ollama local (una dirección de tu propia máquina se acepta sin más)
+#   llm:
+#     provider: ollama
+#     base_url: http://localhost:11434
+#     model: qwen2.5-coder:7b
+#
+#   Por seguridad, «api_key» en este archivo se ignora, y un «base_url» que no sea de tu
+#   máquina solo vale si tu entorno lo permite (FORGE_LLM_HOSTS): un repositorio ajeno no
+#   puede dirigir tu clave a otro servidor.
+# ============================================================
+llm:
+  provider: anthropic
+  model: sonnet
+  cache: true                   # caché de prompts (solo Anthropic): las instrucciones repetidas se cobran reducidas; false la desactiva
+
+# PERFIL — cómo se conduce el flujo con el usuario
+#   guiado  → (POR DEFECTO) no programa: el sistema decide lo técnico, explica
+#             sin jerga, confirma antes de actuar y encadena los pasos solo.
+#             Es el modo activo si NO se declara este campo. El rigor NO cambia.
+#   experto → controla el stack y las decisiones técnicas (modo desarrollador).
+#             Este archivo de ejemplo lo usa porque ilustra un proyecto de código.
+# Lo establece /sdd.constitucion según cómo describa el usuario su intención.
+perfil: guiado
+
+# ============================================================
+# AGENTES — activa/desactiva y asigna modelo a cada agente
+# ============================================================
+# Modelos recomendados (al momento, 2026):
+#   - opus      → Tareas complejas: razonamiento profundo, revisión, BD, arquitectura
+#   - sonnet    → Implementación: código, tests, docs, operaciones (uso general)
+#   - haiku     → Tareas simples: estados, verificaciones rápidas, formateo
+#
+# Recomendación de Anthropic: usa el modelo MÁS PEQUEÑO que resuelva el problema
+# bien. Subir de tier solo si el agente falla repetidamente.
+# ============================================================
+
+agentes:
+  # Preset "lean" por defecto — activa solo los agentes esenciales para minimizar costo.
+  # Para activar todos: cambia perfil a "enterprise" o descomenta los agentes necesarios.
+  # Agentes opcionales: critico, seguridad, asesor-datos, disenador-api, investigador, operaciones, product-designer, architecture-designer
+
+  # ── Timeout por agente (opcional) ──────────────────────────────────────────
+  # Cada agente puede declarar timeout_ms para sobreescribir el timeout global.
+  # Si no se declara, se usa el valor global de LlmAgentAdapter (120 000 ms).
+  # Ejemplo:
+  #   arquitecto:
+  #     timeout_ms: 300000  # 5 min — análisis complejo de arquitectura
+  #   tester:
+  #     timeout_ms: 120000  # 2 min — generación de tests simples
+  # ───────────────────────────────────────────────────────────────────────────
+
+  # ---------- Diseño y arquitectura ----------
+  arquitecto:
+    activo: true
+    modelo: opus          # HIGH — Recomendado: opus (decisiones difíciles de revertir)
+    descripcion: "Toma decisiones de arquitectura del sistema y diseño técnico de alto nivel."
+
+  architecture-designer:
+    activo: false         # Opcional — actívalo para proyectos nuevos que necesitan elegir stack
+    modelo: sonnet        # Recomendado: sonnet (stack técnico para MVPs)
+    descripcion: "Recomienda el stack técnico más simple viable: frontend, backend, BD, deploy."
+
+  product-designer:
+    activo: false         # Opcional — actívalo para diseño de producto completo (P0/P1/P2)
+    modelo: opus          # Recomendado: opus (decisiones de producto son difíciles de revertir)
+    descripcion: "Genera el ProductDesign completo: pantallas P0/P1/P2, user flow, mvp_scope."
+
+  disenador-api:
+    activo: false         # Opcional — actívalo cuando el proyecto requiera contratos de API formales
+    modelo: sonnet        # Recomendado: sonnet (contratos estructurados)
+    descripcion: "Diseña contratos de API (OpenAPI, GraphQL, gRPC, eventos)."
+
+  asesor-datos:
+    activo: false         # Opcional — actívalo para proyectos con BD compleja o migraciones críticas
+    modelo: opus          # Recomendado: opus (errores en BD son costosos de revertir)
+    descripcion: "Diseño de esquemas, queries, índices, migraciones, performance de BD."
+
+  # ---------- Implementación ----------
+  desarrollador-backend:
+    activo: true
+    modelo: sonnet        # MEDIUM — Recomendado: sonnet (codificación)
+    descripcion: "Implementa lógica de servidor: servicios, APIs, manejo de datos."
+
+  desarrollador-frontend:
+    activo: true
+    modelo: sonnet        # MEDIUM — Recomendado: sonnet (codificación)
+    descripcion: "Implementa UI: componentes, vistas, estado del cliente."
+    # Desactívalo si tu proyecto es backend-only:
+    # activo: false
+
+  operaciones:
+    activo: false         # Opcional — actívalo para proyectos con CI/CD o despliegue automatizado
+    modelo: sonnet        # Recomendado: sonnet
+    descripcion: "CI/CD, despliegues, infraestructura, configuración."
+
+  # ---------- Calidad ----------
+  tester:
+    activo: true
+    modelo: sonnet        # MEDIUM — Recomendado: sonnet (genera tests útiles)
+    descripcion: "Genera y ejecuta tests unitarios, integración y E2E."
+
+  revisor:
+    activo: true
+    modelo: opus          # HIGH — Recomendado: opus (revisión profunda atrapa más bugs)
+    descripcion: "Revisa código contra spec, calidad y constitución."
+
+  critico:
+    activo: false         # Opcional — actívalo para análisis de riesgos en cambios importantes
+    modelo: opus          # Recomendado: opus (encontrar puntos ciegos requiere abstracción)
+    descripcion: "Identifica riesgos, puntos ciegos y asunciones del plan."
+
+  seguridad:
+    activo: false         # Opcional — actívalo para auditorías de seguridad o cambios sensibles
+    modelo: opus          # Recomendado: opus (auditoría de seguridad seria)
+    descripcion: "Audita vulnerabilidades en cambios sensibles."
+
+  documentador:
+    activo: true          # LOW — activo para proyectos que requieren docs formales
+    modelo: haiku         # Recomendado: haiku (tarea de formateo, no razonamiento profundo)
+    descripcion: "Genera documentación técnica útil (no obvia)."
+
+  investigador:
+    activo: false         # Opcional — actívalo para proyectos existentes con deuda técnica compleja
+    modelo: sonnet
+    descripcion: "Analiza el proyecto existente — stack, patrones, deuda técnica — antes de especificar."
+
+# ============================================================
+# RUTAS — dónde se generan los artefactos SDD
+# ============================================================
+rutas:
+  raiz_sdd: ".sdd"                           # Raíz del estado SDD
+  constitucion: ".sdd/memoria/constitucion.md"
+  estado_global: ".sdd/estado.json"
+  especificaciones: ".sdd/especificaciones"  # specs/YYYY-MM-DD-slug/
+  cambios: ".sdd/cambios"                    # Registro cronológico
+  arquitectura: ".sdd/arquitectura"          # ADRs (Decisiones)
+  dominio: ".sdd/dominio"                    # Glosario y definiciones
+  indice: ".sdd/INDICE.md"
+  snapshot: ".sdd/SNAPSHOT.md"
+
+# ============================================================
+# COMPORTAMIENTO — cómo opera el flujo
+# ============================================================
+comportamiento:
+  # Detección automática del tamaño del cambio
+  deteccion_tamano_automatica: true
+
+  # Para cambios micro (≤3 archivos, <10 líneas), generar spec+plan+tareas en un paso
+  ruta_rapida_micro: true
+
+  # Marcadores que se insertan cuando la información es ambigua
+  marcador_clarificacion: "[NECESITA_ACLARACION]"
+  marcador_pendiente: "[PENDIENTE]"
+  marcador_decidir: "[POR_DECIDIR]"
+
+  # Numeración automática de especificaciones
+  numeracion_especificaciones: "fecha"   # "fecha" | "secuencial" | "ambos"
+  # fecha:       YYYY-MM-DD-nombre-slug
+  # secuencial:  001-nombre-slug
+  # ambos:       2026-06-08-001-nombre-slug
+
+  # Confirmación antes de implementar
+  requerir_aprobacion_plan: true
+  requerir_aprobacion_tareas: false
+
+  # Versionado semántico de la constitución
+  versionado_constitucion: true
+
+# ============================================================
+# CONTROL DE VERSIONES — completamente opcional
+# ============================================================
+# SDD-ES NO se acopla a Git, GitLab, ni ningún VCS.
+# Esta sección es solo para que TUS hooks personalizados
+# puedan leer la preferencia.
+control_versiones:
+  sistema: "git"      # "git" | "mercurial" | "ninguno" | "otro"
+  crear_ramas: false  # Si tu flujo usa una rama por feature, escribe tu propio hook
+  hacer_commits: false
+
+# ============================================================
+# CALIDAD — umbrales que el agente revisor aplica
+# ============================================================
+calidad:
+  cobertura_tests_minima: 80
+  permitir_warnings_lint: false
+  permitir_codigo_comentado: false
+  longitud_funcion_maxima: 50
+  longitud_archivo_maxima: 400
+
+# ============================================================
+# PROTECCIONES — archivos/comandos que SDD no toca
+# ============================================================
+# Esta sección es DECLARATIVA — los valores son leídos por
+# guardia-seguridad.sh (hooks-ejemplo/guardia-seguridad.sh).
+# Para activar las protecciones, copia ese hook a .sdd/hooks/.
+# ============================================================
+protecciones:
+  # Archivos que los agentes NUNCA deben leer ni escribir
+  no_tocar_archivos:
+    - ".env*"
+    - "*.pem"
+    - "*.key"
+    - "*.p12"
+    - "secrets/**"
+    - "**/credentials*"
+    - "**/*secret*"
+    - ".aws/credentials"
+    - ".ssh/*"
+    - ".sdd/memoria/constitucion.md"   # solo /sdd.constitucion lo edita
+
+  # Comandos que se bloquean sin excepción (nunca se ejecutan)
+  comandos_prohibidos:
+    - "rm -rf /"
+    - "rm -rf ~"
+    - "rm -rf ."
+    - "DROP DATABASE"
+    - "DROP SCHEMA"
+    - "git push --force"
+    - "git push -f"
+    - "git reset --hard"
+    - "git clean -fxd"
+
+  # Comandos que requieren confirmación explícita del usuario (escribir "SI")
+  requerir_confirmacion:
+    - "rm -rf"
+    - "DROP TABLE"
+    - "DELETE FROM"
+    - "TRUNCATE"
+    - "git reset"
+    - "git branch -D"
+    - "git push"
+    - "npm publish"
+    - "pip uninstall"
+    - "terraform apply"
+    - "terraform destroy"
+    - "kubectl delete"
+    - "helm uninstall"
+    - "docker push"
+
+  # Ramas protegidas — requieren confirmación para implementar directamente
+  ramas_protegidas:
+    - main
+    - master
+    - develop
+    - release
+    - production
+    - staging
+
+# ============================================================
+# FIGMA — integración con el MCP sdd-figma-mcp
+# ============================================================
+# Si tu proyecto tiene diseños en Figma, define aquí el file_key.
+# El orquestador de /sdd.implementar lo usa automáticamente
+# cuando detecta tareas de tipo UI/frontend.
+#
+# Para obtener el file_key: abre el archivo en Figma → URL:
+#   figma.com/file/ESTE_ES_EL_FILE_KEY/nombre-del-archivo
+# ============================================================
+figma:
+  # Activa la integración con Figma en tareas de frontend
+  # Requiere: FIGMA_PAT en variables de entorno
+  enabled: false
+
+  # Clave del archivo principal de diseño del proyecto
+  # file_key: "REEMPLAZA_CON_TU_FILE_KEY"
+
+  # Si quieres un archivo diferente por sección (opcional)
+  # archivos:
+  #   componentes: "KEY_DEL_ARCHIVO_DE_COMPONENTES"
+  #   pantallas:   "KEY_DEL_ARCHIVO_DE_PANTALLAS"
+
+  # Comportamiento automático en /sdd.implementar
+  auto_analizar_sistema_diseño: true   # Siempre analiza antes de implementar UI
+  auto_mapear_si_file_key: true        # Mapea estilos si file_key está definido
+  bloquear_si_tokens_sin_mapear: false # Si true, pide confirmación antes de continuar
+
+# ============ MAPAS Y INDEXACIÓN ============
+mapeos:
+  enabled: true
+  # Modo de actualización: "manual" | "perezoso" | "automático"
+  modo_actualizacion: perezoso
+  
+  # Detecta archivos nuevos automáticamente
+  validacion_perezosa: true
+  
+  # Lenguajes a indexar
+  lenguajes:
+    - typescript
+    - javascript
+    - python
+    - rust
+    - go
+    - java
+    - csharp
+    - ruby
+    - php
+  
+  # Directorios a ignorar (como .gitignore)
+  ignorar:
+    - node_modules
+    - dist
+    - build
+    - target
+    - vendor
+    - __pycache__
+    - .git
+    - .sdd
+
+# ============ MEMORIA DE AGENTES ============
+memoria:
+  # Tamaño máximo del archivo de memoria de un agente antes de auto-compresión
+  # Por defecto: 50000 (50 KB). Reduce para comprimir más agresivamente.
+  umbral_bytes: 50000
+
+  # Backend de almacenamiento de memoria
+  # "sqlite"   → usa .sdd/memoria/memoria.db (recuperación selectiva, recomendado)
+  # "markdown" → usa .sdd/memoria/agente-{nombre}.md (comportamiento pre-v2.8)
+  backend: "sqlite"
+
+  # Número de entradas a cargar al iniciar sesión (solo aplica con query-memory.js)
+  recuperacion_por_defecto: 10
+
+# ============ SESIÓN ============
+sesion:
+  # Modo de trabajo de la sesión actual
+  # "normal"    → flujo completo con crítico, seguridad y ADR
+  # "rapido"    → omite crítico en planificar/implementar (ahorra ~30% tokens)
+  # "prototipo" → omite crítico, seguridad y ADR (prototipado rápido, sin garantías)
+  modo: "normal"
+
+  # Pasos individuales que se pueden omitir manualmente (independiente del modo)
+  # Opciones: "checklist", "aclarar", "analizar", "critico", "adr", "seguridad"
+  omitir_pasos: []
+
+# ============ COMPRESIÓN DE TOKENS ============
+compresion:
+  # Activar compresión
+  enabled: true
+  
+  # Modo global de salida
+  # "normal" | "lite" | "full" | "ultra"
+  modo_salida_usuario: lite
+  
+  # Modo de comunicación entre agentes (usuario no ve)
+  # "normal" | "lite" | "full" | "ultra"
+  modo_agentes_internos: ultra
+  
+  # Comprimir archivos internos del plugin (commands, agents, skills)
+  # CUIDADO: hace menos legibles para editar
+  comprimir_plugin: false
+  
+  # Términos técnicos que NUNCA se abrevian
+  preservar_terminos:
+    - autenticación
+    - autorización
+    - verificación
+    - base de datos
+    - algoritmo
+  
+  # Patrones que NUNCA se comprimen (regex)
+  patrones_protegidos:
+    - PELIGRO
+    - CUIDADO
+    - "NO USAR EN PRODUCCIÓN"
+    - ELIMINAR
+    - BORRAR
+    - irreversible
+
+# ─── Motor Agéntico (ciclo verificado) ───────────────────────────────────────
+# Desde 5.0.0 el ciclo es el modo por defecto: forge run corrige cada tarea de código hasta que
+# sus pruebas pasan, ejecutándola en un contenedor Docker sin red (exige Docker). "clasico" ejecuta en tu equipo.
+# Ver .sdd/especificaciones/2026-10-03-ciclo-verificado/ y ADR-01 a ADR-11.
+motor:
+  modo: ciclo                   # ciclo | clasico
+  grafo: auto                   # auto | propio (el único motor; langgraph se retiró en 5.0.0 y solo avisa)
+  recuperador: archivos         # fuente de contexto de los agentes: archivos | semantico (añade trozos parecidos del repositorio)
+  embeddings: hash              # con semantico: hash (local, sin red; léxico, no semántico) | ollama (servidor local, vectores semánticos)
+  embeddings_modelo: nomic-embed-text   # modelo de Ollama para los vectores
+  nivel_maximo: opus            # nivel de modelo más alto que puede usar un agente: opus (sin límite) | sonnet | haiku
+  max_iteraciones: 5            # ejecuciones fallidas antes de pedir revisión humana
+  sin_progreso: 3               # ejecuciones fallidas seguidas con la misma salida antes de pedir revisión (0 lo desactiva)
+  # Pruebas confiables (ADR-20). Tras un pase se hacen cambios pequeños en el código escrito, de uno en uno y
+  # sobre una copia, y se ejecutan las pruebas contra cada uno: unas pruebas que comprueban algo los detectan.
+  mutacion: informar            # no (no medir) | informar (mide y anota la puntuación; no cambia el resultado) | exigir (bajo el mínimo: un refuerzo de las pruebas y, si no basta, revisión humana)
+  mutacion_minima: 0.6          # con exigir: proporción mínima de cambios detectados, de 0 a 1
+  mutacion_max: 10              # cambios probados por tarea, como mucho (cada uno es una ejecución de las pruebas)
+  mutacion_timeout_s: 300       # tiempo máximo de la medición por tarea
+  contexto_max_bytes: 65536     # tope del contexto entregado a cada agente
+  implementador: bloque         # bloque (una respuesta con los archivos completos) | turnos (opcional, ADR-21: lee, busca y edita por pasos; hoy solo con el proveedor anthropic; con otros avisa y usa bloque)
+  turnos_max: 30                # con turnos: respuestas del modelo por intento antes de ejecutar las pruebas finales (no son iteraciones)
+  turnos_pruebas_max: 5         # con turnos: veces que el implementador puede ejecutar las pruebas por intento
+
+sandbox:
+  cpus: 1
+  memoria: 512m
+  pids: 256
+  timeout_s: 120
+  salida_max_bytes: 1048576
+  # runtime: runsc              # mecanismo de aislamiento de Docker (--runtime). Sin indicar, el de Docker por defecto.
+  #                             # Si se indica y Docker no lo tiene, el ciclo no empieza (código de salida 4).
+
+presupuesto:
+  tope_usd: 2.00                # al alcanzarlo no se inicia ninguna llamada más
+  umbral_degradacion_usd: 1.50  # a partir de aquí se usa un modelo más barato
+  degradar_a: escalon           # escalon (opus → sonnet → haiku) | local
+
+# Modelos y precios (ADR-19). Opcional: sin estas secciones se usa la lista incluida
+# (core/precios.js), cuya fecha de revisión muestran `forge status` y `forge doctor`.
+# Lo que indiques aquí manda sobre la lista incluida.
+#
+# modelos:                        # identificador de modelo de cada nivel (solo opus, sonnet, haiku)
+#   opus: claude-opus-5-5
+#   sonnet: claude-sonnet-5-5
+#   haiku: claude-haiku-5-5
+#
+# precios:                        # USD por millón de tokens; claves planas <identificador>_entrada y _salida
+#   claude-sonnet-5-5_entrada: 2
+#   claude-sonnet-5-5_salida: 10
+#   "qwen2.5-coder:7b_entrada": 0 # un identificador con dos puntos va entre comillas
+#   "qwen2.5-coder:7b_salida": 0
+#
+#   claude-sonnet-5-5_cache_escritura: 2.5   # opcionales: caché de prompts (guardar y reutilizar).
+#   claude-sonnet-5-5_cache_lectura: 0.1     # Sin ellos: lista incluida o, si no, el precio de entrada
+#
+# Un precio no numérico, negativo o sin su pareja impide empezar. Un modelo sin precio
+# se cobra al más alto conocido y deja un aviso con su nombre en el registro.

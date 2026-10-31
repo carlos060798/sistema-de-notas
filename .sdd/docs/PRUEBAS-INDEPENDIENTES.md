@@ -1,0 +1,119 @@
+# Pruebas de ejecución en proyectos independientes
+
+Esta guía explica cómo comprobar FORGE sobre proyectos que **no** son su repositorio, instalado como lo haría un usuario. Sirve para ver, antes de publicar, si el ciclo verificado funciona fuera del entorno donde se desarrolló.
+
+## Qué comprueba y qué no
+
+| Comprueba | No comprueba |
+|---|---|
+| Que el paquete empaquetado con `npm pack` contiene lo necesario y se instala | La integración continua en Linux (eso lo hace GitHub al abrir la solicitud de cambio) |
+| Que `forge run --motor ciclo` arranca en un proyecto ajeno, usa Docker y termina o se pausa con un motivo | Proyectos grandes: los seis de prueba son pequeños |
+| Con modelo real: que un modelo resuelve la tarea, cuántas iteraciones y cuánto cuesta | Las integraciones con GitHub, GitLab y Jira (necesitan cuentas reales; ver `docs/integraciones-externas.md`) |
+| Lo que ocurre con código existente, dos tareas encadenadas, Python y Go | Que el gasto calculado coincida con la factura: eso lo miras tú en la consola del proveedor |
+
+## Requisitos
+
+- Node 20 o superior y Docker en marcha (el ciclo no ejecuta código generado fuera de un contenedor).
+- Para el modo real: la clave del proveedor elegido en su variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`; con un servicio compatible con OpenAI, además `OPENAI_BASE_URL` y `--proveedor openai`). **No la guardes en ningún archivo**; ponla solo en el entorno de la sesión.
+- Conexión a internet la primera vez: se descargan las imágenes base de los contenedores y las dependencias del paquete.
+
+## Paso 1: humo, sin gasto
+
+```
+node scripts/pruebas-independientes.mjs --modelo humo
+```
+
+Empaqueta FORGE, lo instala en una carpeta temporal, crea seis proyectos y lanza el ciclo con el proveedor de pruebas. **No se espera «éxito»**: ese proveedor no resuelve tareas. Se comprueba que todo arranca y que cada proyecto termina con un motivo explicado, no con un error sin explicar. Cuesta 0.
+
+Si falla aquí, no tiene sentido gastar: corrige primero. Los fallos típicos están en la sección «Si algo falla».
+
+## Paso 2: una prueba real pequeña
+
+```
+set ANTHROPIC_API_KEY=...            (PowerShell: $env:ANTHROPIC_API_KEY='...')
+node scripts/pruebas-independientes.mjs --modelo real --proyectos js-nuevo --tope 0.15
+```
+
+Un proyecto, nivel económico, tope de 0.15 USD. Si termina en `exito`, sigue con los demás.
+
+## Paso 3: la tanda completa
+
+```
+node scripts/pruebas-independientes.mjs --modelo real --tope 0.30
+```
+
+Los seis proyectos con tope de 0.30 USD cada uno. **El gasto máximo posible es el tope por el número de proyectos** (1.80 USD con los valores anteriores); en la práctica, con el nivel económico, cada proyecto cuesta entre 0.02 y 0.15 USD. Para tareas más difíciles usa `--nivel sonnet`.
+
+## Los proyectos de prueba
+
+| Nombre | Qué ejercita |
+|---|---|
+| `js-nuevo` | JavaScript desde cero: una función con casos borde |
+| `js-existente` | Código existente: un cambio que toca dos archivos sin nombrarlos y no debe romper las pruebas que ya había |
+| `py-pytest` | Python con `pytest` declarado en `requirements.txt` |
+| `go-modulo` | Go con módulo, Unicode y pruebas de tabla |
+| `dos-tareas` | Dos tareas encadenadas: la segunda usa el módulo de la primera |
+| `gestor-tareas` | Repositorio existente con pruebas propias y cuatro tareas encadenadas en varios módulos (validación, servicio, exportación CSV, informe) |
+
+## Cómo leer el informe
+
+El script escribe `informe.md` e `informe.json` en la carpeta de salida y los muestra en pantalla.
+
+| Resultado | Qué significa | Qué hacer |
+|---|---|---|
+| `exito` | El ciclo terminó y las pruebas pasaron en el contenedor | Revisa el código generado en la carpeta del proyecto |
+| `pausa: iteraciones` | Se agotaron las iteraciones sin que pasen | Mira las pruebas que escribió el agente: con el nivel económico a veces tienen valores esperados erróneos. Prueba `--nivel sonnet` |
+| `pausa: sin_progreso` | La misma salida varias veces seguidas | Probablemente pruebas rotas por sí mismas |
+| `pausa: presupuesto` | Se alcanzó el tope | Sube `--tope` o revisa el gasto |
+| `pausa: infraestructura` | Docker, la red o el proveedor fallaron | Mira el detalle del informe |
+| `pausa: salida_invalida` | El modelo no devolvió el formato esperado | Repítelo; si se repite, es un hallazgo |
+
+Cada carpeta de proyecto conserva `.sdd/events.jsonl` (qué pasó, paso a paso) y `.sdd/motor/` (puntos de guardado y libro de gasto). Se puede reanudar una pausa con `forge resume --cwd <carpeta>`.
+
+## Si algo falla
+
+| Síntoma | Causa probable |
+|---|---|
+| «Docker es obligatorio… no responde» | Docker no está en marcha; arráncalo y repite |
+| `npm install del paquete falló` | Sin internet o registro bloqueado; comprueba la red |
+| `pausa: infraestructura` con «Request was aborted» | El proveedor tardó más del tiempo máximo (120 s por defecto): configurable con `llm.timeout_s`. La llamada pudo cobrarse: el informe marca las llamadas con gasto estimado |
+| Sin resultado en `go-modulo` y mucho tiempo | La primera vez, la imagen de Go se prepara con red y tarda varios minutos |
+| Los proyectos fallan todos igual | Mira `informe.md`: la última salida de cada uno suele nombrar la causa |
+
+## Después de las pruebas
+
+- Compara el gasto calculado total con el saldo del proveedor, antes y después.
+- Borra la carpeta de salida cuando termines (el script no la borra, para que puedas inspeccionarla).
+- **Rota la clave** si la usaste en un equipo o sesión que no controlas.
+- Si encuentras algo, guarda `informe.json` y el `.sdd/events.jsonl` del proyecto afectado (revisa antes que no lleven datos tuyos) y abre una incidencia con la plantilla `fallo.md`.
+
+## Registro: ejecución con Gemini (2026-10-25)
+
+Proveedor `openai` (compatible) apuntando a Gemini con `OPENAI_BASE_URL`, nivel económico, Docker Desktop 29.7.2 en Windows, paquete instalado con `npm pack`. Los cuatro proyectos más exigentes, con tope de 1.00 USD calculado cada uno:
+
+| Proyecto | Resultado | Iteraciones | Llamadas | Gasto calculado | Tiempo |
+|---|---|---|---|---|---|
+| js-existente | exito | 1 | 3 | 0.1926 USD | 72 s |
+| dos-tareas | exito | 2 | 6 | 0.3514 USD | 146 s |
+| py-pytest | exito | 1 | 3 | 0.1699 USD | 97 s |
+| go-modulo | exito | 1 | 3 | 0.2230 USD | 421 s |
+
+- Modelo usado: `gemini-3.5-flash`. Antes se intentó `gemini-2.5-pro` (404: ya no está disponible para cuentas nuevas) y `gemini-3.1-pro-preview` (429: sin cuota en esa clave); ninguno gastó nada. Con `gemini-2.5-flash`, `js-nuevo` pausó con `salida_invalida` (JSON del implementador mal formado) tras 6 llamadas.
+- El gasto calculado es una **cota alta**: Fragua no tiene el precio de Gemini y cuenta cada llamada al precio más caro conocido. No se comparó con la factura de Google.
+- Es una sola ejecución por proyecto y proyectos pequeños; no demuestra fiabilidad, solo que el flujo completo funciona con un segundo proveedor real (CA-006-02 de `proveedores-agnosticos` pide tres proyectos con tope y evidencia en la carpeta de la spec).
+- La clave de Anthropic de prueba fue rechazada por la API (`401 invalid x-api-key`): no hay ejecución con Claude en este registro.
+
+## Registro: proyecto `gestor-tareas` con Claude y con Gemini (2026-10-25)
+
+`gestor-tareas` es un proyecto más parecido a uno real: un repositorio existente con pruebas propias y **cuatro tareas encadenadas** (validación, servicio, exportación CSV, informe) en varios módulos. Se lanza con `--proyectos gestor-tareas`.
+
+| Proveedor y modelo | Resultado | Tareas | Llamadas | Tokens (entrada / salida) | Gasto calculado | Tiempo |
+|---|---|---|---|---|---|---|
+| Anthropic, `claude-haiku-5-5` | exito | 4/4 | 12 | 39 587 / 18 628 | 0.0153 USD | 363 s |
+| Gemini, `gemini-3.5-flash` | pausa: infraestructura (429, cuota) | 1/4 | 4 | — | 0.2756 USD | 154 s |
+
+- Las tablas de estos registros se transcribieron a mano del `informe.md` y del libro de gasto (`gasto.jsonl`); los tokens no los emite el script.
+- **Claude:** el ciclo terminó en éxito. Comprobación aparte: las 48 pruebas del proyecto (las 3 originales y las 45 nuevas) pasan al ejecutarlas yo en un contenedor sin red, de solo lectura y sin capacidades. El código revisado a mano (`src/exportar.js`) cumple RFC 4180 como pedía la tarea.
+- **El gasto de Claude no está contrastado.** 0.0153 USD para 58 000 tokens parece bajo; la tabla de precios de Fragua puede no tener la tarifa vigente de ese modelo. Compáralo con la consola de Anthropic antes de fiarte de la cifra.
+- **Gemini:** completó la tarea 1 (validación) y se detuvo en la 2 por `429 You exceeded your current quota`. Reanudar más tarde con `fragua resume --decision continuar` dio el mismo error: la cuota de esa clave está agotada, no es un fallo del ciclo.
+- Una ejecución por proveedor. Con los dos juntos y la de la sección anterior se cumple el hecho de haber probado un segundo proveedor real, pero `CA-006-02` de `proveedores-agnosticos` sigue pidiendo tres proyectos con tope y evidencia en la carpeta de la spec.
