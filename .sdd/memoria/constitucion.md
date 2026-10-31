@@ -4,7 +4,7 @@
 
 ## Propósito y misión
 
-Dar a un docente de una escuela rural de Colombia el control de notas, asistencia, observaciones y planeación de clases en su propio PC, sin internet y sin instalar nada complicado. Si el sistema se daña, el docente recupera todo desde una copia o desde un Excel.
+Dar a un docente de primaria (grados 0 a 5) de una escuela rural de Colombia el control de notas, planes de área y de aula, guías, avance de temas y planeación de clases en su propio PC, sin internet y sin instalar nada complicado. Si el sistema se daña, el docente recupera todo desde una copia o desde un Excel.
 
 ## Stack técnico (propuesto, ver ADR-01)
 

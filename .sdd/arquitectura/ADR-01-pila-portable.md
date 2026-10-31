@@ -46,3 +46,4 @@ Excel: `exceljs`. PDF: `pdfkit` o `pdf-lib`. Word: `docx`. Todas JavaScript puro
 - **S0.1** Generar un ejecutable SEA que abra SQLite y sirva una página, y medir tamaño y memoria.
 - **S0.2** Exportar e importar un `.xlsx` de ida y vuelta sin perder datos.
 - **S0.3** Generar un PDF y un DOCX con tildes y eñes.
+- **S0.4** Guardar adjuntos de las guías dentro de `datos/` y comprobar que el respaldo y el Excel los recuperan.
