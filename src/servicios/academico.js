@@ -2,7 +2,7 @@
 // Lógica académica sobre la base: años, materias, estudiantes, notas y nivelación.
 // Valida con mensajes en español para el docente; las reglas de cálculo viven en dominio/notas.js.
 import { conTransaccion } from '../datos/base.js';
-import { validarNota, definitivaPeriodo, definitivaAnio, aprobado } from '../dominio/notas.js';
+import { validarNota, definitivaPeriodo, definitivaAnio, aprobado, UMBRAL_APROBACION } from '../dominio/notas.js';
 
 /** Error esperado por entrada incorrecta del usuario (la interfaz lo muestra tal cual). */
 export class ErrorValidacion extends Error {
@@ -39,6 +39,20 @@ export function crearAnio(db, anio) {
 /** @param {Db} db */
 export const listarAnios = (db) => todos(db, 'select id, anio, cerrado from anio_lectivo order by anio desc');
 
+/** Nota mínima para aprobar: por defecto 3,0; el docente puede cambiarla. @param {Db} db */
+export function leerUmbral(db) {
+  const f = /** @type {{ valor: string } | undefined} */ (uno(db, "select valor from config where clave = 'nota.umbral'"));
+  const n = f ? Number(f.valor) : UMBRAL_APROBACION;
+  return Number.isFinite(n) ? n : UMBRAL_APROBACION;
+}
+/** @param {Db} db @param {number} umbral */
+export function guardarUmbral(db, umbral) {
+  if (typeof umbral !== 'number' || !Number.isFinite(umbral) || umbral < 2 || umbral > 4 || Math.round(umbral * 10) !== umbral * 10 && Math.abs(Math.round(umbral * 10) - umbral * 10) > 1e-9) {
+    throw new ErrorValidacion('La nota mínima para aprobar debe estar entre 2,0 y 4,0, con un solo decimal');
+  }
+  db.prepare("insert into config(clave, valor) values ('nota.umbral', ?) on conflict(clave) do update set valor = excluded.valor").run(String(umbral));
+  return umbral;
+}
 /** @param {Db} db @param {number} id */
 export function cerrarAnio(db, id) {
   if (!uno(db, 'select 1 x from anio_lectivo where id = ?', id)) throw new ErrorValidacion('El año lectivo no existe');
@@ -155,17 +169,17 @@ export function guardarNotas(db, d) {
      on conflict(matricula_id, materia_id, periodo) do update set n1 = excluded.n1, n2 = excluded.n2, n3 = excluded.n3`,
   ).run(d.matricula_id, d.materia_id, d.periodo, n1, n2, n3);
   const definitiva = definitivaPeriodo(n1, n2, n3);
-  return { definitiva, aprobado: aprobado(definitiva.valor) };
+  return { definitiva, aprobado: aprobado(definitiva.valor, leerUmbral(db)) };
 }
 
 /** Definitivas de los cuatro periodos y del año para una matrícula y materia. @param {any[]} notas filas de `nota` */
-function calcular(notas) {
+function calcular(notas, umbral = UMBRAL_APROBACION) {
   const periodos = [1, 2, 3, 4].map((p) => {
     const r = notas.find((x) => x.periodo === p);
     return r ? definitivaPeriodo(r.n1, r.n2, r.n3) : /** @type {import('../dominio/notas.js').Definitiva} */ ({ estado: 'incompleta', valor: null });
   });
   const a = definitivaAnio(periodos);
-  return { periodos, anio: { estado: a.estado, valor: a.valor, aprobado: aprobado(a.valor) } };
+  return { periodos, anio: { estado: a.estado, valor: a.valor, aprobado: aprobado(a.valor, umbral) } };
 }
 
 /**
@@ -174,17 +188,18 @@ function calcular(notas) {
  */
 export function listarNotas(db, q) {
   validarPeriodo(q.periodo);
+  const umbral = leerUmbral(db);
   const alumnos = listarEstudiantes(db, { anio_id: q.anio_id, grado: q.grado });
   return alumnos.map((al) => {
     const notas = todos(db, 'select periodo, n1, n2, n3 from nota where matricula_id = ? and materia_id = ?', al.matricula_id, q.materia_id);
     const actual = notas.find((x) => x.periodo === q.periodo);
-    const c = calcular(notas);
+    const c = calcular(notas, umbral);
     const niv = f(uno(db, 'select actividades, fecha, nota from nivelacion where matricula_id = ? and materia_id = ?', al.matricula_id, q.materia_id));
     const definitiva = c.periodos[q.periodo - 1];
     return {
       matricula_id: al.matricula_id, estudiante_id: al.estudiante_id, nombre: al.nombre, grado: al.grado,
       n1: actual?.n1 ?? null, n2: actual?.n2 ?? null, n3: actual?.n3 ?? null,
-      definitiva, aprobado: aprobado(definitiva.valor), periodos: c.periodos, anio: c.anio,
+      definitiva, aprobado: aprobado(definitiva.valor, umbral), periodos: c.periodos, anio: c.anio,
       nivelacion: niv ? { actividades: String(niv.actividades), fecha: niv.fecha ?? null, nota: niv.nota ?? null } : null,
     };
   });
@@ -195,6 +210,7 @@ export function listarNotas(db, q) {
  * @param {Db} db @param {{ anio_id: number, base: 'periodo' | 'anio', periodo?: number, grado?: number, materia_id?: number }} q
  */
 export function desaprobadas(db, q) {
+  const umbral = leerUmbral(db);
   if (q.base === 'periodo') validarPeriodo(q.periodo);
   const filas = todos(db,
     `select m.id matricula_id, e.id estudiante_id, e.nombre, m.grado_id grado, ma.id materia_id, ma.nombre materia,
@@ -207,9 +223,9 @@ export function desaprobadas(db, q) {
   for (const r of filas) { const k = `${r.matricula_id}:${r.materia_id}`; (grupos.get(k) ?? grupos.set(k, []).get(k))?.push(r); }
   const salida = [];
   for (const g of grupos.values()) {
-    const c = calcular(g);
+    const c = calcular(g, umbral);
     const d = q.base === 'periodo' ? c.periodos[/** @type {number} */ (q.periodo) - 1] : c.anio;
-    if (d.valor !== null && aprobado(d.valor) === false) {
+    if (d.valor !== null && aprobado(d.valor, umbral) === false) {
       const r = g[0];
       salida.push({ matricula_id: r.matricula_id, estudiante_id: r.estudiante_id, nombre: r.nombre, grado: r.grado, materia_id: r.materia_id, materia: r.materia, valor: d.valor });
     }
@@ -234,7 +250,7 @@ export function guardarNivelacion(db, d) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha) || Number.isNaN(Date.parse(d.fecha))) throw new ErrorValidacion('La fecha debe escribirse como AAAA-MM-DD');
     fecha = d.fecha;
   }
-  const c = calcular(todos(db, 'select periodo, n1, n2, n3 from nota where matricula_id = ? and materia_id = ?', d.matricula_id, d.materia_id));
+  const c = calcular(todos(db, 'select periodo, n1, n2, n3 from nota where matricula_id = ? and materia_id = ?', d.matricula_id, d.materia_id), leerUmbral(db));
   if (c.anio.estado !== 'completa' || c.anio.aprobado !== false) {
     throw new ErrorValidacion('La nivelación solo se abre cuando la definitiva del año de la materia es menor de 3,0');
   }

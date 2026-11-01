@@ -35,3 +35,29 @@ test('un año cerrado se puede reabrir y entonces vuelve a admitir cambios', asy
   assert.ok(listarCopias(usb).some((c) => c.motivo === 'manual'));
   assert.equal((await llamar('PUT', '/api/respaldo/extra', { carpeta: 'relativa' })).status, 400);
 });
+
+test('rutas nuevas: nota mínima, copias a conservar, asistencia, observaciones y copiar planes', async () => {
+  const s = crearServidor({ db: abrirBase(':memory:'), rutaBase: null, carpetaCopias: '' });
+  const { url } = await s.escuchar(); aCerrar.push(() => s.cerrar());
+  const llamar = (/** @type {string} */ m, /** @type {string} */ r, /** @type {any} */ b = undefined) =>
+    fetch(url + r, { method: m, headers: { 'x-token': s.token, ...(b ? { 'content-type': 'application/json' } : {}) }, body: b ? JSON.stringify(b) : undefined });
+  const j = async (/** @type {string} */ m, /** @type {string} */ r, /** @type {any} */ b = undefined) => (await llamar(m, r, b)).json();
+  assert.equal((await j('GET', '/api/umbral')).umbral, 3);
+  assert.equal((await j('PUT', '/api/umbral', { umbral: 3.5 })).umbral, 3.5);
+  assert.equal((await llamar('PUT', '/api/umbral', { umbral: 9 })).status, 400);
+  assert.equal((await j('GET', '/api/respaldo/retencion')).copias, 30);
+  assert.equal((await j('PUT', '/api/respaldo/retencion', { copias: 12 })).copias, 12);
+  assert.equal((await llamar('PUT', '/api/respaldo/retencion', { copias: 2 })).status, 400);
+  const a1 = await j('POST', '/api/anios', { anio: 2026 }); const a2 = await j('POST', '/api/anios', { anio: 2027 });
+  const mat = await j('POST', '/api/materias', { nombre: 'Artística' });
+  const est = await j('POST', '/api/estudiantes', { nombre: 'Luz', documento: null, grado: 2, anio_id: a1.id });
+  assert.equal((await llamar('PUT', '/api/asistencia', { matricula_id: est.matricula_id, fecha: '2026-04-01', estado: 'presente' })).status, 200);
+  assert.equal((await j('GET', `/api/asistencia?anio_id=${a1.id}&grado=2&fecha=2026-04-01`))[0].estado, 'presente');
+  assert.equal((await llamar('PUT', '/api/observaciones', { matricula_id: est.matricula_id, texto: 'Destacada' })).status, 200);
+  assert.equal((await j('GET', `/api/observaciones?matricula_id=${est.matricula_id}`)).texto, 'Destacada');
+  await j('PUT', '/api/planes', { tipo: 'area', anio_id: a1.id, materia_id: mat.id, grado: 2, titulo: 'Plan' });
+  assert.deepEqual(await j('POST', '/api/planes/copiar', { desde_anio_id: a1.id, hasta_anio_id: a2.id }), { copiados: 1, omitidos: 0 });
+  const t = await j('PUT', '/api/temas', { anio_id: a1.id, materia_id: mat.id, grado: 2, periodo: 2, nombre: 'Color' });
+  const av = await j('GET', `/api/temas?anio_id=${a1.id}&materia_id=${mat.id}&grado=2`);
+  assert.equal(av.porPeriodo.length, 4); assert.equal(av.porPeriodo[1].total, 1); assert.ok(t.id);
+});

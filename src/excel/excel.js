@@ -10,9 +10,9 @@ import { conTransaccion, VERSION_ESQUEMA } from '../datos/base.js';
 import { validarNota } from '../dominio/notas.js';
 
 /** Orden de dependencias: los padres antes que los hijos. */
-export const TABLAS = ['anio_lectivo', 'grado', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase'];
+export const TABLAS = ['anio_lectivo', 'grado', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion'];
 const COLUMNAS_NOTA = /** @type {Record<string, string[]>} */ ({ nota: ['n1', 'n2', 'n3'], nivelacion: ['nota'] });
-const CON_DATOS_DEL_DOCENTE = ['anio_lectivo', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase'];
+const CON_DATOS_DEL_DOCENTE = ['anio_lectivo', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion'];
 
 /** @typedef {{ hoja: string, fila: number, columna: string | null, mensaje: string }} ErrorCelda */
 /** @typedef {Record<string, { nuevos: number, cambiados: number, iguales: number }>} Resumen */
@@ -149,7 +149,10 @@ function procesar(db, wb, aplicar) {
         const upsert = db.prepare(
           `insert into ${t}(${cols.map((c) => c.name).join(',')}) values (${cols.map(() => '?').join(',')}) ` +
           `on conflict(${pk}) do update set ${sinPk.map((c) => `${c.name}=excluded.${c.name}`).join(',')}`);
-        for (let r = 2; r <= ws.rowCount; r++) {
+        // Los planes de aula apuntan a un plan de área: se cargan después de los de área, sin importar el orden de las filas.
+        const filasOrden = Array.from({ length: Math.max(0, ws.rowCount - 1) }, (_, i) => i + 2);
+        if (t === 'plan') { const ip = esperado.indexOf('plan_area_id') + 1; filasOrden.sort((x, y) => Number(ws.getRow(x).getCell(ip).value != null) - Number(ws.getRow(y).getCell(ip).value != null)); }
+        for (const r of filasOrden) {
           const fila = ws.getRow(r);
           /** @type {Record<string, any>} */ const reg = {};
           let vacia = true; let malo = false;

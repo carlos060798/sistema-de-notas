@@ -24,3 +24,4 @@
 2026-11-01T01:34:52Z | UI | ok | rediseno de interfaz (Hoy, menu lateral, respaldo visible), revision del agente product-designer aplicada; 114 pruebas
 2026-11-01T01:44:14Z | F4-6 | ok | adjuntos en guias (en la base, no en Excel), renombrar materias, nota invalida en casilla, apariencia, Nivelacion probada en Edge; arreglada fuga de procesos Edge en pruebas; 120 pruebas
 2026-11-01T01:54:36Z | REV | ok | revision independiente atendida: Excel de otra base bloqueado, apagado tolerante a suspension, copia a USB, bloqueo atomico, reabrir anio; 127 pruebas
+2026-11-01T02:48:30Z | SPEC | ok | cruce con la spec: 31/33 criterios cumplidos, 2 con desviacion; anadidos umbral, asistencia, observaciones, copiar planes, busqueda, avance por periodo; 138 pruebas

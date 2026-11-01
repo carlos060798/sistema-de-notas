@@ -91,7 +91,7 @@ async function cargarEstado() {
 // --- Navegación ---------------------------------------------------------------------------------
 
 const VISTAS = [
-  ['inicio', 'Hoy'], ['notas', 'Notas'], ['estudiantes', 'Estudiantes'], ['nivelacion', 'Nivelación'], ['planeacion', 'Planeación'],
+  ['inicio', 'Hoy'], ['notas', 'Notas'], ['estudiantes', 'Estudiantes'], ['noaprueban', 'No aprueban'], ['nivelacion', 'Nivelación'], ['planeacion', 'Planeación'],
   ['copias', 'Respaldo'], ['config', 'Año y materias'],
 ];
 
@@ -117,7 +117,7 @@ async function mostrar() {
         h('button', { class: 'principal', onclick: () => { vista = 'config'; mostrar(); } }, 'Ir a «Año y materias»')));
       return;
     }
-    await ({ inicio: pantallaInicio, notas: pantallaNotas, estudiantes: pantallaEstudiantes, nivelacion: pantallaNivelacion, planeacion: pantallaPlaneacion, copias: pantallaCopias, config: pantallaConfig })[vista](cont);
+    await ({ inicio: pantallaInicio, noaprueban: pantallaNoAprueban, notas: pantallaNotas, estudiantes: pantallaEstudiantes, nivelacion: pantallaNivelacion, planeacion: pantallaPlaneacion, copias: pantallaCopias, config: pantallaConfig })[vista](cont);
   });
 }
 
@@ -131,6 +131,7 @@ async function pantallaNotas(cont) {
     selector('Materia', opcionesMateria(), sel.materia, (v) => { sel.materia = Number(v); mostrar(); }),
     selector('Periodo', [1, 2, 3, 4].map((p) => [p, `Periodo ${p}`]), sel.periodo, (v) => { sel.periodo = Number(v); mostrar(); }));
   const filas = await json('GET', `/api/notas?anio_id=${sel.anio}&grado=${sel.grado}&materia_id=${sel.materia}&periodo=${sel.periodo}`);
+  const { umbral } = await json('GET', '/api/umbral');
   const cuerpo = h('tbody');
   const resumen = h('p', { class: 'suave' });
   const actualizarResumen = () => {
@@ -150,7 +151,7 @@ async function pantallaNotas(cont) {
     h('div', { class: 'fila-acciones' }, h('span', {}, 'Planilla de esta materia:'),
       h('button', { class: 'secundario', onclick: () => descargarDocumento(planilla + '&formato=xlsx') }, 'Excel'),
       h('button', { class: 'secundario', onclick: () => descargarDocumento(planilla + '&formato=pdf') }, 'PDF')),
-    h('p', { class: 'suave' }, 'Escriba la nota y presione Tab o Enter. Se guarda sola. Puede usar coma o punto (4,5). La escala es de 1,0 a 5,0 y se aprueba con 3,0.')));
+    h('p', { class: 'suave' }, 'Escriba la nota y presione Tab o Enter. Se guarda sola. Puede usar coma o punto (4,5). La escala es de 1,0 a 5,0 y se aprueba con ' + fmt1(umbral) + ' o más.')));
 }
 
 function filaNotas(f, alCambiarResumen) {
@@ -244,6 +245,11 @@ function filaEstudiante(x) {
       tr.replaceChildren(h('td', {}, x.nombre), h('td', {}, x.documento ?? '—'),
         h('td', {}, x.activo ? h('span', { class: 'etiqueta bien' }, 'Activo') : h('span', { class: 'etiqueta' }, 'Archivado')),
         h('td', {}, h('button', { class: 'secundario', onclick: () => pintar(true) }, 'Editar'), ' ',
+          h('button', { class: 'secundario', onclick: () => intentar(async () => {
+            const actual = (await json('GET', `/api/observaciones?matricula_id=${x.matricula_id}`)).texto;
+            const nuevo = prompt(`Observaciones para el boletín de ${x.nombre} (déjelo vacío para quitarlas)`, actual);
+            if (nuevo !== null) { await json('PUT', '/api/observaciones', { matricula_id: x.matricula_id, texto: nuevo }); aviso('Observación guardada'); }
+          }) }, 'Observaciones'), ' ',
           h('details', { class: 'menu-doc' }, h('summary', {}, 'Documentos'), h('div', { class: 'menu-lista' },
             ...[['Boletín PDF', 'boletin', 'pdf'], ['Boletín Word', 'boletin', 'docx'], ['Certificado PDF', 'certificado', 'pdf'], ['Certificado Word', 'certificado', 'docx']].map(([t, tipo, f]) =>
               h('button', { onclick: (ev) => { ev.target.closest('details').open = false; descargarDocumento(`/api/reportes/${tipo}?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=${f}`); } }, t)))), ' ',
@@ -314,6 +320,12 @@ async function pantallaCopias(cont) {
   const copias = await json('GET', '/api/respaldo');
   const extra = (await json('GET', '/api/respaldo/extra')).carpeta;
   const campoExtra = h('input', { type: 'text', value: extra, placeholder: 'Por ejemplo E:\\Respaldos', 'aria-label': 'Carpeta extra para las copias', autocomplete: 'off' });
+  const { copias: retenidas } = await json('GET', '/api/respaldo/retencion');
+  const campoRet = h('input', { type: 'number', min: 5, max: 200, value: retenidas, class: 'corto', 'aria-label': 'Cantidad de copias automáticas a conservar' });
+  const tarjetaRet = h('section', { class: 'tarjeta' }, h('h2', {}, 'Cuántas copias automáticas guardar'),
+    h('p', { class: 'suave' }, 'El programa hace una copia al abrir y otra al cerrar. Se guardan las más recientes; las que usted hace a mano no se borran nunca.'),
+    h('div', { class: 'fila' }, h('label', {}, 'Copias a conservar (5 a 200)', campoRet),
+      h('button', { class: 'principal', onclick: () => intentar(async () => { await json('PUT', '/api/respaldo/retencion', { copias: Number(campoRet.value) }); aviso('Guardado'); mostrar(); }) }, 'Guardar')));
   const tarjetaExtra = h('section', { class: 'tarjeta' }, h('h2', {}, 'Copia también en una memoria USB'),
     h('p', { class: 'suave' }, 'Si escribe aquí una carpeta de su memoria USB, cada vez que cierre el programa se guardará allí otra copia. Si el computador se daña, la copia sigue a salvo.'),
     h('div', { class: 'fila' }, h('label', { class: 'ancha' }, 'Carpeta (ruta completa)', campoExtra),
@@ -342,7 +354,7 @@ async function pantallaCopias(cont) {
       h('h3', {}, 'Recuperar desde un Excel'),
       h('div', { class: 'fila-acciones' }, archivo, h('button', { class: 'secundario', onclick: analizar }, 'Revisar archivo')),
       resultado),
-    tarjetaExtra,
+    tarjetaExtra, tarjetaRet,
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Copias de seguridad'),
       h('p', { class: 'suave' }, 'El programa hace una copia sola al abrirse y al cerrarse. Aquí puede hacer una copia ahora.'),
       h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: () => intentar(async () => { const c = await json('POST', '/api/respaldo'); if (c.extra.estado === 'fallo') aviso('Copia creada, pero ' + c.extra.mensaje, true); else aviso(c.extra.estado === 'ok' ? 'Copia creada. ' + c.extra.mensaje : 'Copia creada'); mostrar(); }) }, 'Crear copia ahora')),
@@ -380,6 +392,8 @@ function informeImportacion(datos, archivo) {
 async function pantallaConfig(cont) {
   const inst = await json('GET', '/api/institucion');
   const campoInst = (clave, etiqueta) => { const i = h('input', { type: 'text', maxlength: 120, value: inst[clave] ?? '' }); return [h('label', {}, etiqueta, i), i]; };
+  const { umbral } = await json('GET', '/api/umbral');
+  const iUmbral = h('input', { type: 'text', inputmode: 'decimal', value: fmt1(umbral), class: 'corto', 'aria-label': 'Nota mínima para aprobar' });
   const [lNom, iNom] = campoInst('institucion', 'Nombre de la institución'); const [lSede, iSede] = campoInst('sede', 'Sede'); const [lDoc, iDoc] = campoInst('docente', 'Docente');
   const anio = h('input', { type: 'number', min: 2000, max: 2100, value: new Date().getFullYear(), class: 'corto' });
   const mat = h('input', { type: 'text', maxlength: 80, autocomplete: 'off' });
@@ -388,6 +402,10 @@ async function pantallaConfig(cont) {
       h('p', { class: 'suave' }, 'Salen en el encabezado de planillas, boletines y certificados. Son opcionales.'),
       h('form', { class: 'fila', onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('PUT', '/api/institucion', { nombre: iNom.value, sede: iSede.value, docente: iDoc.value }); aviso('Datos guardados'); }); } },
         lNom, lSede, lDoc, h('button', { class: 'principal', type: 'submit' }, 'Guardar datos'))),
+    h('section', { class: 'tarjeta' }, h('h2', {}, 'Nota mínima para aprobar'),
+      h('p', { class: 'suave' }, 'Normalmente es 3,0. Si la cambia, todas las pantallas, listas, boletines y certificados usan el nuevo valor.'),
+      h('div', { class: 'fila' }, h('label', {}, 'Nota mínima (entre 2,0 y 4,0)', iUmbral),
+        h('button', { class: 'principal', onclick: () => { const v = leerNota(iUmbral.value); if (v === null || Number.isNaN(v)) return aviso('Escriba un número, por ejemplo 3,0', true); intentar(async () => { const g = await json('PUT', '/api/umbral', { umbral: v }); aviso('Nota mínima guardada: ' + fmt1(g.umbral)); mostrar(); }); } }, 'Guardar nota mínima'))),
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Año lectivo'),
       h('form', { onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('POST', '/api/anios', { anio: Number(anio.value) }); aviso('Año creado'); mostrar(); }); } },
         h('label', {}, 'Año', anio), h('button', { class: 'principal', type: 'submit' }, 'Crear año')),
@@ -422,7 +440,7 @@ async function pantallaRecuperacion(cont) {
 
 // --- Planeación: temas y avance, clases, planes y guías -------------------------------------------
 
-const SECCIONES_PLAN = [['temas', 'Temas y avance'], ['clases', 'Clases'], ['planes', 'Planes de área y aula'], ['guias', 'Guías']];
+const SECCIONES_PLAN = [['temas', 'Temas y avance'], ['clases', 'Clases'], ['planes', 'Planes de área y aula'], ['guias', 'Guías'], ['asistencia', 'Asistencia']];
 const ESTADOS_TEMA = [['pendiente', 'Pendiente'], ['en_curso', 'En curso'], ['visto', 'Visto']];
 let seccionPlan = 'temas';
 const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -435,7 +453,7 @@ async function pantallaPlaneacion(cont) {
       selector('Materia', opcionesMateria(), sel.materia, (v) => { sel.materia = Number(v); mostrar(); })),
     h('div', { class: 'pestanas' }, SECCIONES_PLAN.map(([id, t]) => h('button', { 'aria-current': id === seccionPlan ? 'true' : false, onclick: () => { seccionPlan = id; mostrar(); } }, t))));
   const filtro = `anio_id=${sel.anio}&materia_id=${sel.materia}&grado=${sel.grado}`;
-  const cuerpo = await ({ temas: seccionTemas, clases: seccionClases, planes: seccionPlanes, guias: seccionGuias })[seccionPlan](filtro);
+  const cuerpo = await ({ temas: seccionTemas, clases: seccionClases, planes: seccionPlanes, guias: seccionGuias, asistencia: seccionAsistencia })[seccionPlan](filtro);
   cont.replaceChildren(barra, cuerpo);
 }
 
@@ -450,6 +468,7 @@ async function seccionTemas(filtro) {
   return h('section', { class: 'tarjeta' },
     h('h3', {}, `Avance: ${r.avance.vistos} de ${r.avance.total} temas vistos (${r.avance.porcentaje} %)`),
     h('progress', { max: 100, value: r.avance.porcentaje, 'aria-label': 'Avance de temas' }),
+    h('p', { class: 'suave' }, r.porPeriodo.map((p) => `Periodo ${p.periodo}: ${p.total ? p.porcentaje + ' %' : 'sin temas'}`).join(' · ')),
     h('div', { class: 'fila' }, lNombre, h('label', {}, 'Periodo', periodo),
       h('button', { class: 'principal', onclick: () => intentar(async () => {
         await json('PUT', '/api/temas', { ...baseCuerpo(), periodo: Number(periodo.value), nombre: nombre.value }); mostrar();
@@ -466,14 +485,15 @@ async function seccionTemas(filtro) {
 }
 
 async function seccionClases(filtro) {
-  const [clases, temas] = await Promise.all([json('GET', `/api/clases?${filtro}`), json('GET', `/api/temas?${filtro}`)]);
+  const [clases, temas, guias] = await Promise.all([json('GET', `/api/clases?${filtro}`), json('GET', `/api/temas?${filtro}`), json('GET', `/api/guias?materia_id=${sel.materia}&grado=${sel.grado}`)]);
   const fecha = h('input', { type: 'date', value: hoyISO() });
   const tema = h('select', {}, h('option', { value: '' }, '(sin tema)'), temas.temas.map((t) => h('option', { value: t.id }, t.nombre)));
+  const guia = h('select', {}, h('option', { value: '' }, '(sin guía)'), guias.map((g) => h('option', { value: g.id }, g.titulo)));
   const [lObj, obj] = campoLargo('Objetivo'); const [lAct, act] = campoLargo('Actividades'); const [lRec, rec] = campoLargo('Recursos');
   return h('section', { class: 'tarjeta' }, h('h3', {}, 'Planear una clase'),
-    h('div', { class: 'fila' }, h('label', {}, 'Fecha', fecha), h('label', {}, 'Tema', tema)), lObj, lAct, lRec,
+    h('div', { class: 'fila' }, h('label', {}, 'Fecha', fecha), h('label', {}, 'Tema', tema), h('label', {}, 'Guía', guia)), lObj, lAct, lRec,
     h('button', { class: 'principal', onclick: () => intentar(async () => {
-      await json('PUT', '/api/clases', { ...baseCuerpo(), fecha: fecha.value, tema_id: tema.value ? Number(tema.value) : null, objetivo: obj.value, actividades: act.value, recursos: rec.value });
+      await json('PUT', '/api/clases', { ...baseCuerpo(), fecha: fecha.value, tema_id: tema.value ? Number(tema.value) : null, guia_id: guia.value ? Number(guia.value) : null, objetivo: obj.value, actividades: act.value, recursos: rec.value });
       aviso('Clase guardada'); mostrar();
     }) }, 'Guardar clase'),
     clases.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Fecha', 'Objetivo', 'Hecha', ''].map((t) => h('th', {}, t)))),
@@ -485,27 +505,40 @@ async function seccionClases(filtro) {
 
 let edicionPlan = null; let edicionGuia = null; // elemento que se está editando, o null si se crea uno nuevo
 
+const PLANTILLA_PLAN = 'Objetivos:\n\nEstándares:\n\nCompetencias:\n\nContenidos por periodo:\n\nCriterios de evaluación:\n';
+
 async function seccionPlanes(filtro) {
-  const planes = await json('GET', `/api/planes?${filtro}`);
+  const [planes, areas] = await Promise.all([json('GET', `/api/planes?${filtro}`), json('GET', `/api/planes?anio_id=${sel.anio}&tipo=area&materia_id=${sel.materia}&grado=${sel.grado}`)]);
   const e = edicionPlan && planes.find((p) => p.id === edicionPlan);
-  const tipo = h('select', {}, h('option', { value: 'area', selected: e?.tipo === 'area' }, 'Plan de área'), h('option', { value: 'aula', selected: e?.tipo === 'aula' }, 'Plan de aula'));
+  const tipo = h('select', { onchange: () => { filaAula.hidden = tipo.value !== 'aula'; } }, h('option', { value: 'area', selected: e?.tipo === 'area' }, 'Plan de área'), h('option', { value: 'aula', selected: e?.tipo === 'aula' }, 'Plan de aula'));
+  const periodo = h('select', {}, h('option', { value: '' }, '(todos)'), [1, 2, 3, 4].map((p) => h('option', { value: p, selected: e?.periodo === p }, `Periodo ${p}`)));
+  const area = h('select', {}, h('option', { value: '' }, '(ninguno)'), areas.map((x) => h('option', { value: x.id, selected: e?.plan_area_id === x.id }, x.titulo)));
+  const filaAula = h('div', { class: 'fila' }, h('label', {}, 'Periodo', periodo), h('label', {}, 'Plan de área al que pertenece', area));
+  filaAula.hidden = (e?.tipo ?? 'area') !== 'aula';
   const [lTit, tit] = campoTexto('Título'); const [lCon, con] = campoLargo('Contenido');
-  if (e) { tit.value = e.titulo; con.value = e.contenido; }
-  return h('section', { class: 'tarjeta' }, h('h3', {}, e ? 'Editar plan' : 'Nuevo plan'),
-    h('div', { class: 'fila' }, h('label', {}, 'Tipo', tipo), lTit), lCon,
+  if (e) { tit.value = e.titulo; con.value = e.contenido; } else con.value = PLANTILLA_PLAN;
+  const otrosAnios = estado.anios.filter((x) => x.id !== sel.anio && !x.cerrado);
+  const destino = h('select', {}, otrosAnios.map((x) => h('option', { value: x.id }, x.anio)));
+  return h('div', {}, h('section', { class: 'tarjeta' }, h('h3', {}, e ? 'Editar plan' : 'Nuevo plan'),
+    h('div', { class: 'fila' }, h('label', {}, 'Tipo', tipo), lTit), filaAula, lCon,
     h('div', { class: 'fila-acciones' },
       h('button', { class: 'principal', onclick: () => intentar(async () => {
-        await json('PUT', '/api/planes', { ...(e ? { id: e.id } : {}), ...baseCuerpo(), tipo: tipo.value, titulo: tit.value, contenido: con.value });
+        await json('PUT', '/api/planes', { ...(e ? { id: e.id } : {}), ...baseCuerpo(), tipo: tipo.value, titulo: tit.value, contenido: con.value,
+          periodo: tipo.value === 'aula' && periodo.value ? Number(periodo.value) : null, plan_area_id: tipo.value === 'aula' && area.value ? Number(area.value) : null });
         edicionPlan = null; aviso('Plan guardado'); mostrar();
       }) }, e ? 'Guardar cambios' : 'Guardar plan'),
       e ? h('button', { class: 'secundario', onclick: () => { edicionPlan = null; mostrar(); } }, 'Cancelar') : null),
-    ...planes.map((p) => h('details', {}, h('summary', {}, `${p.tipo === 'area' ? 'Área' : 'Aula'} — ${p.titulo}`),
+    ...planes.map((p) => h('details', {}, h('summary', {}, `${p.tipo === 'area' ? 'Área' : 'Aula'}${p.periodo ? ' · periodo ' + p.periodo : ''} — ${p.titulo}`),
       h('pre', { class: 'texto' }, p.contenido),
       h('div', { class: 'fila-acciones' },
         h('button', { class: 'secundario', onclick: () => { edicionPlan = p.id; mostrar(); } }, 'Editar'),
         h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=docx`) }, 'Word'),
         h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=pdf`) }, 'PDF'),
-        h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar')))));
+        h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar'))))),
+    otrosAnios.length ? h('section', { class: 'tarjeta' }, h('h3', {}, 'Copiar los planes de este año a otro'),
+      h('p', { class: 'suave' }, 'Copia todos los planes de área y de aula de este año (de todas las materias y grados), sin repetir los que ya existan.'),
+      h('div', { class: 'fila' }, h('label', {}, 'Copiar al año', destino),
+        h('button', { class: 'secundario', onclick: () => intentar(async () => { const c = await json('POST', '/api/planes/copiar', { desde_anio_id: sel.anio, hasta_anio_id: Number(destino.value) }); aviso(`Copiados: ${c.copiados}. Ya existían: ${c.omitidos}.`); }) }, 'Copiar planes'))) : null);
 }
 
 /** Selector de archivo y botón para adjuntar a una guía. */
@@ -518,12 +551,19 @@ function adjuntador(g) {
   } }, 'Adjuntar archivo'));
 }
 
+let busquedaGuia = '';
 async function seccionGuias() {
-  const guias = await json('GET', `/api/guias?materia_id=${sel.materia}&grado=${sel.grado}`);
+  const guias = await json('GET', `/api/guias?materia_id=${sel.materia}&grado=${sel.grado}${busquedaGuia ? '&texto=' + encodeURIComponent(busquedaGuia) : ''}`);
   const e = edicionGuia && guias.find((g) => g.id === edicionGuia);
+  const buscar = h('input', { type: 'search', value: busquedaGuia, placeholder: 'Palabra del tema, título o contenido', 'aria-label': 'Buscar guías' });
   const [lTema, tema] = campoTexto('Tema'); const [lTit, tit] = campoTexto('Título'); const [lCon, con] = campoLargo('Contenido de la guía');
   if (e) { tema.value = e.tema; tit.value = e.titulo; con.value = e.contenido; }
-  return h('section', { class: 'tarjeta' }, h('h3', {}, e ? 'Editar guía' : 'Nueva guía (sirve para todos los años)'),
+  return h('div', {}, h('section', { class: 'tarjeta' }, h('h3', {}, 'Buscar guías'),
+    h('div', { class: 'fila' }, h('label', { class: 'ancha' }, 'Buscar', buscar),
+      h('button', { class: 'secundario', onclick: () => { busquedaGuia = buscar.value.trim(); mostrar(); } }, 'Buscar'),
+      busquedaGuia ? h('button', { class: 'secundario', onclick: () => { busquedaGuia = ''; mostrar(); } }, 'Ver todas') : null),
+    h('p', { class: 'suave' }, busquedaGuia ? `${guias.length} guía(s) con «${busquedaGuia}» en este grado y materia` : `${guias.length} guía(s) en este grado y materia`)),
+  h('section', { class: 'tarjeta' }, h('h3', {}, e ? 'Editar guía' : 'Nueva guía (sirve para todos los años)'),
     h('div', { class: 'fila' }, lTema, lTit), lCon,
     h('div', { class: 'fila-acciones' },
       h('button', { class: 'principal', onclick: () => intentar(async () => {
@@ -543,7 +583,47 @@ async function seccionGuias() {
         h('button', { class: 'secundario', onclick: () => { edicionGuia = g.id; mostrar(); } }, 'Editar'),
         h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=docx`) }, 'Word'),
         h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=pdf`) }, 'PDF'),
-        h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar la guía «${g.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/guias/${g.id}`); mostrar(); }); } }, 'Quitar')))));
+        h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar la guía «${g.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/guias/${g.id}`); mostrar(); }); } }, 'Quitar'))))));
+}
+
+let fechaAsistencia = new Date().toISOString().slice(0, 10);
+async function seccionAsistencia() {
+  const lista = await json('GET', `/api/asistencia?anio_id=${sel.anio}&grado=${sel.grado}&fecha=${fechaAsistencia}`);
+  const fecha = h('input', { type: 'date', value: fechaAsistencia, 'aria-label': 'Fecha de la asistencia', onchange: (ev) => { if (ev.target.value) { fechaAsistencia = ev.target.value; mostrar(); } } });
+  const OPCIONES = [['', 'Sin registrar'], ['presente', 'Presente'], ['ausente', 'Ausente'], ['excusa', 'Excusa']];
+  return h('section', { class: 'tarjeta' }, h('h3', {}, 'Asistencia del grado'),
+    h('div', { class: 'fila' }, h('label', {}, 'Fecha', fecha),
+      h('button', { class: 'secundario', onclick: () => intentar(async () => { for (const x of lista.filter((y) => !y.estado)) await json('PUT', '/api/asistencia', { matricula_id: x.matricula_id, fecha: fechaAsistencia, estado: 'presente' }); aviso('Todos marcados como presentes'); mostrar(); }) }, 'Marcar a todos presentes')),
+    lista.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Estudiante', 'Asistencia', 'Ausencias en el año'].map((t) => h('th', {}, t)))),
+      h('tbody', {}, lista.map((x) => h('tr', {}, h('td', {}, x.nombre),
+        h('td', {}, h('select', { 'aria-label': `Asistencia de ${x.nombre}`, onchange: (ev) => intentar(async () => { await json('PUT', '/api/asistencia', { matricula_id: x.matricula_id, fecha: fechaAsistencia, estado: ev.target.value || null }); aviso('Guardado'); }) },
+          OPCIONES.map(([v, t]) => h('option', { value: v, selected: (x.estado ?? '') === v }, t)))),
+        h('td', {}, String(x.ausencias)))))) : h('p', { class: 'vacio' }, 'No hay estudiantes en este grado.'));
+}
+
+// --- No aprueban (CA-002-04) --------------------------------------------------------------------
+
+const filtroNoAprueban = { base: 'anio', periodo: 1, grado: '', materia: '' };
+async function pantallaNoAprueban(cont) {
+  const f = filtroNoAprueban;
+  const q = `anio_id=${sel.anio}&base=${f.base}${f.base === 'periodo' ? '&periodo=' + f.periodo : ''}${f.grado !== '' ? '&grado=' + f.grado : ''}${f.materia !== '' ? '&materia_id=' + f.materia : ''}`;
+  const lista = await json('GET', `/api/desaprobadas?${q}`);
+  const cambiar = (clave) => (v) => { f[clave] = clave === 'periodo' ? Number(v) : v; mostrar(); };
+  const grupos = new Map();
+  for (const x of lista) { const k = `${NOMBRE_GRADO[x.grado]} — ${x.materia}`; (grupos.get(k) ?? grupos.set(k, []).get(k)).push(x); }
+  cont.replaceChildren(
+    h('section', { class: 'contexto' }, h('h2', {}, 'Estudiantes que no aprueban'),
+      h('div', { class: 'fila' },
+        selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }),
+        selector('Definitiva', [['anio', 'del año'], ['periodo', 'de un periodo']], f.base, cambiar('base')),
+        f.base === 'periodo' ? selector('Periodo', [1, 2, 3, 4].map((p) => [p, `Periodo ${p}`]), f.periodo, cambiar('periodo')) : null,
+        selector('Grado', [['', 'Todos'], ...opcionesGrado()], f.grado, cambiar('grado')),
+        selector('Materia', [['', 'Todas'], ...opcionesMateria()], f.materia, cambiar('materia')))),
+    h('section', { class: 'tarjeta' },
+      lista.length ? [...grupos.entries()].map(([titulo, xs]) => h('div', {}, h('h3', {}, titulo),
+        h('table', {}, h('thead', {}, h('tr', {}, ['Estudiante', 'Definitiva'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, xs.map((x) => h('tr', { class: 'reprobado' }, h('td', {}, x.nombre), h('td', {}, fmt1(x.valor)))))))) :
+        h('p', { class: 'vacio' }, 'Nadie tiene la definitiva por debajo de la nota mínima con estos filtros.')));
 }
 
 // --- Inicio -------------------------------------------------------------------------------------
@@ -572,7 +652,7 @@ async function pantallaInicio(cont) {
       botonExcel) : null,
     h('div', { class: 'rejilla' },
       dato('', r.estudiantes, r.estudiantes === 1 ? 'estudiante' : 'estudiantes', h('span', { class: 'suave' }, r.porGrado.map((g) => `${NOMBRE_GRADO[g.grado]}: ${g.n}`).join(' · ') || 'Aún no hay estudiantes')),
-      dato(r.noAprobados ? 'mal' : 'bien', r.noAprobados, r.noAprobados === 1 ? 'estudiante no aprueba' : 'estudiantes no aprueban', h('span', { class: 'suave' }, `${r.materiasReprobadas} materias con definitiva menor de 3,0`)),
+      dato(r.noAprobados ? 'mal' : 'bien', r.noAprobados, r.noAprobados === 1 ? 'estudiante no aprueba' : 'estudiantes no aprueban', h('span', { class: 'suave' }, `${r.materiasReprobadas} materias por debajo de la nota mínima`), r.noAprobados ? h('button', { class: 'secundario', onclick: () => { vista = 'noaprueban'; mostrar(); } }, 'Ver quiénes') : null),
       dato(r.nivelacionesPendientes ? 'alerta' : 'bien', r.nivelacionesPendientes, 'nivelaciones pendientes', r.nivelacionesPendientes ? h('button', { class: 'secundario', onclick: () => { vista = 'nivelacion'; mostrar(); } }, 'Ver nivelaciones') : null),
       dato('', `${r.temas.porcentaje} %`, 'de los temas vistos', h('progress', { max: 100, value: r.temas.porcentaje, 'aria-label': 'Avance de temas' }), h('span', { class: 'suave' }, `${r.temas.vistos} de ${r.temas.total} temas`)),
       dato(rp.ultimaCopia ? 'bien' : 'alerta', rp.ultimaCopia ? hace(rp.ultimaCopia) : 'Ninguna', 'Última copia automática', h('span', { class: 'suave' }, `${rp.copias} copias guardadas`)),

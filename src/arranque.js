@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { abrirBase } from './datos/base.js';
 import { crearCopia, aplicarRetencion, diagnosticar } from './respaldo/respaldo.js';
 import { crearServidor } from './servidor/servidor.js';
-import { copiarAExtra } from './respaldo/extra.js';
+import { copiarAExtra, leerRetencion } from './respaldo/extra.js';
 
 /** Navegadores con modo «aplicación» (ventana sin barra), en orden de preferencia. */
 function candidatosNavegador() {
@@ -53,7 +53,8 @@ export async function iniciar(o) {
   const rutaBase = path.join(carpetaDatos, 'notas.db');
   const carpetaCopias = path.join(carpetaDatos, 'copias');
   const rutaLock = path.join(carpetaDatos, 'notas.lock');
-  const retencion = o.retencion ?? 30; // unas 15 sesiones de uso (una copia al abrir y otra al cerrar)
+  /** Copias automáticas que se guardan: la opción de prueba, o lo que el docente configuró (por defecto 30, unas 15 sesiones). @param {import('node:sqlite').DatabaseSync} d */
+  const retener = (d) => o.retencion ?? leerRetencion(d);
   const ventana = o.abrirVentana ?? true;
   fs.mkdirSync(carpetaDatos, { recursive: true });
 
@@ -72,7 +73,7 @@ export async function iniciar(o) {
   /** @type {import('node:sqlite').DatabaseSync | null} */ let db = null;
   if (diag.estado !== 'danada') {
     db = abrirBase(rutaBase);
-    if (diag.estado === 'ok') { crearCopia(db, carpetaCopias, 'abrir'); aplicarRetencion(carpetaCopias, retencion); }
+    if (diag.estado === 'ok') { crearCopia(db, carpetaCopias, 'abrir'); aplicarRetencion(carpetaCopias, retener(db)); }
   }
   const servidor = crearServidor({
     db, rutaBase, carpetaCopias,
@@ -98,8 +99,8 @@ export async function iniciar(o) {
     clearInterval(vigilante);
     try {
       if (servidor.ctx.db && servidor.ctx.modo === 'ok') {
-        crearCopia(servidor.ctx.db, carpetaCopias, 'cerrar'); aplicarRetencion(carpetaCopias, retencion);
-        const extra = copiarAExtra(servidor.ctx.db, 'cerrar', retencion); if (extra.estado === 'fallo') console.error(extra.mensaje);
+        const n = retener(servidor.ctx.db); crearCopia(servidor.ctx.db, carpetaCopias, 'cerrar'); aplicarRetencion(carpetaCopias, n);
+        const extra = copiarAExtra(servidor.ctx.db, 'cerrar', n); if (extra.estado === 'fallo') console.error(extra.mensaje);
         servidor.ctx.db.close();
       }
     } finally {

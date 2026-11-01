@@ -134,5 +134,18 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   assert.equal(await ev(`document.documentElement.getAttribute('data-theme')`), 'light');
   await ev(`document.getElementById('apariencia').click()`);
   assert.equal(await ev(`document.documentElement.getAttribute('data-theme')`), 'dark');
+
+  // No aprueban: Beto perdió el año; la lista lo muestra
+  await menu('No aprueban');
+  await hasta(`document.body.textContent.includes('Beto Pérez')`, true);
+  // Asistencia: marcar a Ana como ausente y comprobarlo en la base
+  await menu('Planeación');
+  await ev(`[...document.querySelectorAll('.pestanas button')].find((b) => b.textContent === 'Asistencia').click()`);
+  await hasta(`document.querySelectorAll('tbody select').length`, 2);
+  await ev(`(() => { const s = document.querySelector('tbody select'); s.value = 'ausente'; s.dispatchEvent(new Event('change')); })()`);
+  await hasta(`document.getElementById('aviso').textContent`, 'Guardado');
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const asis = await (await fetch(`${app.url}/api/asistencia?anio_id=${anio.id}&grado=0&fecha=${hoyISO}`, { headers: { 'x-token': app.token } })).json();
+  assert.equal(asis[0].estado, 'ausente');
   assert.deepEqual(errores, []);
 });

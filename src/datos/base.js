@@ -107,6 +107,22 @@ const MIGRACIONES = [
     datos blob not null
   );
   `,
+  `
+  alter table plan add column periodo integer check (periodo is null or periodo between 1 and 4);
+  alter table plan add column plan_area_id integer references plan(id);
+  alter table clase add column guia_id integer references guia(id);
+  create table asistencia (
+    id integer primary key,
+    matricula_id integer not null references matricula(id),
+    fecha text not null,
+    estado text not null check (estado in ('presente','ausente','excusa')),
+    unique (matricula_id, fecha)
+  );
+  create table observacion (
+    matricula_id integer primary key references matricula(id),
+    texto text not null
+  );
+  `,
 ];
 
 export const VERSION_ESQUEMA = MIGRACIONES.length;

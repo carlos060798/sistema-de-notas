@@ -1,7 +1,8 @@
 // @ts-check
 // Datos de los documentos (planilla, boletín, certificado): se arman una vez y luego cada formato
 // (Excel, PDF, Word) solo los dibuja, así los tres muestran siempre las mismas cifras.
-import { listarMaterias, listarEstudiantes, listarNotas, ErrorValidacion } from '../servicios/academico.js';
+import { listarMaterias, listarEstudiantes, listarNotas, leerUmbral, ErrorValidacion } from '../servicios/academico.js';
+import { leerObservacion } from '../servicios/planeacion.js';
 
 /** @typedef {import('node:sqlite').DatabaseSync} Db */
 export const NOMBRES_GRADO = ['Transición', 'Primero', 'Segundo', 'Tercero', 'Cuarto', 'Quinto'];
@@ -59,7 +60,7 @@ export function datosBoletin(db, q) {
   const reprobadas = materias.filter((m) => m.aprobado === false);
   return {
     ...encabezado(db), anio: anio(db, q.anio_id), estudiante: est.nombre, documento: est.documento ?? '', grado: NOMBRES_GRADO[est.grado],
-    materias, reprobadas: reprobadas.map((m) => m.materia),
+    materias, reprobadas: reprobadas.map((m) => m.materia), umbral: leerUmbral(db), observacion: leerObservacion(db, q.matricula_id),
     // «Promovido» solo se afirma con el año completo; si faltan notas se dice «en curso» y no se inventa.
     situacion: !completas ? 'En curso' : reprobadas.length === 0 ? 'Aprobó todas las materias' : 'Tiene materias por nivelar',
   };

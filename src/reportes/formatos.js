@@ -78,7 +78,8 @@ export function boletinPdf(d, ruta) {
     doc.text(`Estudiante: ${d.estudiante}${d.documento ? ` — Documento: ${d.documento}` : ''}`).text(`Grado: ${d.grado}`).moveDown();
     tablaPdf(doc, CAB_BOLETIN, filasBoletin(d), [130, 32, 32, 32, 32, 40, 80, 60]);
     doc.moveDown().font('Helvetica-Bold').text(`Situación: ${d.situacion}`);
-    doc.font('Helvetica').fontSize(9).text('Escala de 1,0 a 5,0. Se aprueba con 3,0 o más. La nivelación se muestra aparte y no reemplaza la nota original.');
+    if (d.observacion) doc.moveDown(0.5).font('Helvetica-Bold').fontSize(11).text('Observaciones: ', { continued: true }).font('Helvetica').text(d.observacion);
+    doc.moveDown(0.5).font('Helvetica').fontSize(9).text(`Escala de 1,0 a 5,0. Se aprueba con ${texto(d.umbral)} o más. La nivelación se muestra aparte y no reemplaza la nota original.`);
   });
 }
 
@@ -113,7 +114,8 @@ export function boletinDocx(d, ruta) {
     new Paragraph(`Grado: ${d.grado}`),
     tablaDocx(CAB_BOLETIN, filasBoletin(d)),
     new Paragraph({ children: [new TextRun({ text: `Situación: ${d.situacion}`, bold: true })] }),
-    new Paragraph('Escala de 1,0 a 5,0. Se aprueba con 3,0 o más. La nivelación se muestra aparte y no reemplaza la nota original.'),
+    ...(d.observacion ? [new Paragraph({ children: [new TextRun({ text: 'Observaciones: ', bold: true }), new TextRun(d.observacion)] })] : []),
+    new Paragraph(`Escala de 1,0 a 5,0. Se aprueba con ${texto(d.umbral)} o más. La nivelación se muestra aparte y no reemplaza la nota original.`),
   ] }] }), ruta);
 }
 

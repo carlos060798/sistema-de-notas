@@ -43,3 +43,19 @@ export function copiarAExtra(db, motivo, retencion) {
     return { estado: 'fallo', carpeta, mensaje: `No se pudo copiar a ${carpeta}: ${/** @type {Error} */ (e).message}. ¿Está conectada la memoria USB?` };
   }
 }
+
+const CLAVE_RETENCION = 'respaldo.retencion';
+export const RETENCION_POR_DEFECTO = 30;
+
+/** Cuántas copias automáticas se conservan (configurable por el docente). @param {Db} db */
+export function leerRetencion(db) {
+  const f = /** @type {{ valor: string } | undefined} */ (db.prepare('select valor from config where clave = ?').get(CLAVE_RETENCION));
+  const n = f ? Number(f.valor) : RETENCION_POR_DEFECTO;
+  return Number.isInteger(n) && n >= 5 && n <= 200 ? n : RETENCION_POR_DEFECTO;
+}
+/** @param {Db} db @param {number} n */
+export function guardarRetencion(db, n) {
+  if (!Number.isInteger(n) || n < 5 || n > 200) throw new ErrorValidacion('Elija entre 5 y 200 copias');
+  db.prepare('insert into config(clave, valor) values (?, ?) on conflict(clave) do update set valor = excluded.valor').run(CLAVE_RETENCION, String(n));
+  return n;
+}
