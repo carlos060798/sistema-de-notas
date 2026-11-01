@@ -90,11 +90,14 @@ export function datosTexto(db, tipo, id) {
     ? `${fila.tipo === 'area' ? 'Plan de área' : 'Plan de aula'} — ${fila.materia} — ${NOMBRES_GRADO[fila.grado]} — ${fila.anio}`
     : `Guía — ${fila.materia} — ${NOMBRES_GRADO[fila.grado]}${fila.tema ? ' — ' + fila.tema : ''}`;
   let contenido = String(fila.contenido);
+  /** Secciones con título, para dibujarlas en negrita (solo el plan de área). @type {[string, string][] | null} */
+  let secciones = null;
   if (tipo === 'plan' && fila.tipo === 'area') {
-    const secciones = /** @type {[string, string][]} */ ([['Objetivos', fila.objetivos], ['Estándares', fila.estandares], ['Competencias', fila.competencias],
+    const secciones0 = /** @type {[string, string][]} */ ([['Objetivos', fila.objetivos], ['Estándares', fila.estandares], ['Competencias', fila.competencias],
       ['Contenidos del periodo 1', fila.contenidos_p1], ['Contenidos del periodo 2', fila.contenidos_p2], ['Contenidos del periodo 3', fila.contenidos_p3], ['Contenidos del periodo 4', fila.contenidos_p4],
       ['Criterios de evaluación', fila.criterios], ['Otras notas', fila.contenido]]);
-    contenido = secciones.filter(([, t]) => String(t ?? '').trim()).map(([t, x]) => t + '\n' + String(x).trim()).join('\n\n');
+    secciones = /** @type {[string, string][]} */ (secciones0.filter(([, t]) => String(t ?? '').trim()).map(([t, x]) => [t, String(x).trim()]));
+    contenido = secciones.map(([t, x]) => t + '\n' + x).join('\n\n');
   }
-  return { ...encabezado(db), titulo: String(fila.titulo), subtitulo, contenido, anio: Number(fila.anio ?? new Date().getFullYear()) };
+  return { ...encabezado(db), titulo: String(fila.titulo), subtitulo, contenido, secciones, anio: Number(fila.anio ?? new Date().getFullYear()) };
 }

@@ -66,7 +66,7 @@ const hoy = () => { const d = new Date(); return `${d.getFullYear()}${String(d.g
 
 /**
  * @param {{ db: import('node:sqlite').DatabaseSync | null, rutaBase?: string | null, carpetaCopias?: string | null,
- *           modo?: 'ok' | 'recuperacion', motivoDano?: string | null, leerRecurso?: (nombre: string) => Buffer }} opciones
+ *           modo?: 'ok' | 'recuperacion', motivoDano?: string | null, leerRecurso?: (nombre: string) => Buffer, retardoExcel?: number }} opciones
  */
 export function crearServidor(opciones) {
   /** @type {Contexto} */
@@ -248,6 +248,7 @@ export function crearServidor(opciones) {
     const tmp = path.join(os.tmpdir(), `notas-in-${crypto.randomUUID()}.xlsx`);
     fs.writeFileSync(tmp, datos);
     excelEnCurso++;
+    if (opciones.retardoExcel) await new Promise((r) => setTimeout(r, opciones.retardoExcel)); // solo para las pruebas: alarga la operación
     try { return await fn(tmp); } finally { excelEnCurso--; fs.rmSync(tmp, { force: true }); }
   }
 
@@ -318,7 +319,7 @@ export function crearServidor(opciones) {
       if (e instanceof ErrorHttp) return enviarJson(res, e.status, { error: e.message, ...e.extra });
       if (e instanceof ErrorValidacion) return enviarJson(res, 400, { error: e.message });
       if (e instanceof ErrorImportacion) {
-        return enviarJson(res, e.codigo === 'CONFIRMACION' ? 409 : 422, { error: e.message, codigo: e.codigo, errores: e.errores, resumen: e.resumen });
+        return enviarJson(res, e.codigo === 'CONFIRMACION' ? 409 : 422, { error: e.message, codigo: e.codigo, errores: e.errores, resumen: e.resumen, avisos: e.avisos });
       }
       console.error('Error interno:', e); // el detalle queda en la consola, no viaja al navegador
       return enviarJson(res, 500, { error: 'Ocurrió un error inesperado. Los datos no se modificaron a medias.' });

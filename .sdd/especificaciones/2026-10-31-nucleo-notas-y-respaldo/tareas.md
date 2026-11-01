@@ -39,5 +39,5 @@
 ## F6 Empaquetado y cierre
 - [x] **T6.1** `esbuild` + SEA + GitHub Actions que publica el `.exe`.
 - [ ] **T6.2** Prueba en el ASUS con Windows 10: arranque, memoria, restauración.
-- [ ] **T6.3** Prueba visual de PDF y Word.
+- [~] **T6.3** Prueba visual de PDF y Word. PDF de boletín, certificado y plan revisados a la vista; los Word NO se pudieron ver (sin Word ni LibreOffice en el equipo de desarrollo).
 - [x] **T6.4** Revisión independiente (informe en reportes/2026-10-31-revision-independiente.md; altos y medios atendidos, 3 bajos pendientes), suite completa, verificacion.md.

@@ -90,9 +90,13 @@ export function certificadoPdf(d, ruta) {
     doc.fontSize(13).text('CERTIFICADO DE ESTUDIO', { align: 'center' }).moveDown();
     doc.font('Helvetica').fontSize(11).text(declaracion(d), { align: 'justify' }).moveDown();
     tablaPdf(doc, ['Materia', 'Definitiva año', 'Resultado'], d.materias.map((m) => [m.materia, texto(m.anio), estado(m.aprobado)]), [250, 100, 120]);
+    doc.moveDown(1.5).text(expedido());
     doc.moveDown(3).text('_____________________________').text(d.docente || 'Docente');
   });
 }
+
+/** Fecha de expedición del certificado, en palabras. @param {Date} [hoy] */
+export const expedido = (hoy = new Date()) => `Expedido el ${hoy.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 
 /** @param {Boletin} d */
 const declaracion = (d) => `Se certifica que ${d.estudiante}${d.documento ? `, con documento ${d.documento},` : ''} cursó el grado ${d.grado} en el año ${d.anio}. Situación: ${d.situacion}.`;
@@ -126,7 +130,7 @@ export function certificadoDocx(d, ruta) {
     new Paragraph({ text: 'CERTIFICADO DE ESTUDIO', alignment: AlignmentType.CENTER }),
     new Paragraph({ text: declaracion(d), alignment: AlignmentType.JUSTIFIED }),
     tablaDocx(['Materia', 'Definitiva año', 'Resultado'], d.materias.map((m) => [m.materia, texto(m.anio), estado(m.aprobado)])),
-    new Paragraph(''), new Paragraph('_____________________________'), new Paragraph(d.docente || 'Docente'),
+    new Paragraph(''), new Paragraph(expedido()), new Paragraph(''), new Paragraph('_____________________________'), new Paragraph(d.docente || 'Docente'),
   ] }] }), ruta);
 }
 
@@ -140,7 +144,9 @@ export function textoPdf(d, ruta) {
     if (titulo(d)) doc.font('Helvetica').fontSize(10).text(titulo(d));
     doc.font('Helvetica-Bold').fontSize(15).text(d.titulo).moveDown(0.2);
     doc.font('Helvetica').fontSize(10).text(d.subtitulo).moveDown();
-    doc.fontSize(11).text(d.contenido || '(sin contenido)', { align: 'left' });
+    doc.fontSize(11);
+    if (d.secciones) for (const [t, x] of d.secciones) { doc.font('Helvetica-Bold').text(t).font('Helvetica').text(x).moveDown(0.6); }
+    else doc.text(d.contenido || '(sin contenido)', { align: 'left' });
   });
 }
 /** @param {Texto} d @param {string} ruta */
@@ -149,6 +155,7 @@ export function textoDocx(d, ruta) {
     ...(titulo(d) ? [new Paragraph(titulo(d))] : []),
     new Paragraph({ text: d.titulo, heading: HeadingLevel.HEADING_1 }),
     new Paragraph(d.subtitulo),
-    ...(d.contenido || '(sin contenido)').split(/\r?\n/).map((l) => new Paragraph(l)),
+    ...(d.secciones ? d.secciones.flatMap(([t, x]) => [new Paragraph({ children: [new TextRun({ text: t, bold: true })] }), ...x.split(/\r?\n/).map((l) => new Paragraph(l)), new Paragraph('')])
+      : (d.contenido || '(sin contenido)').split(/\r?\n/).map((l) => new Paragraph(l))),
   ] }] }), ruta);
 }

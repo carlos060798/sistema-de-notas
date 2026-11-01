@@ -27,3 +27,4 @@
 2026-11-01T02:48:30Z | SPEC | ok | cruce con la spec: 31/33 criterios cumplidos, 2 con desviacion; anadidos umbral, asistencia, observaciones, copiar planes, busqueda, avance por periodo; 138 pruebas
 2026-11-01T02:59:45Z | V014 | ok | materias por grado y plan de area con campos; 33/33 criterios; bajos 9-11 atendidos; 148 pruebas; exe humo OK
 2026-11-01T03:10:18Z | V015 | ok | auditoria final atendida (A1-A3, M1-M5): Excel sin identidad, versiones anteriores, copia completa, subcarpeta USB; trazabilidad corregida; 159 pruebas
+2026-11-01T03:33:00Z | V016 | ok | ventanas propias, avisos de importacion, prueba restauracion durante Excel, certificado con fecha, hoja de validacion; 164 pruebas; PDFs vistos, Word no

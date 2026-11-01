@@ -8,6 +8,7 @@ import path from 'node:path';
 import ExcelJS from 'exceljs';
 import { conTransaccion, VERSION_ESQUEMA } from '../datos/base.js';
 import { validarNota } from '../dominio/notas.js';
+import { materiaEnGrado } from '../servicios/academico.js';
 
 /** Orden de dependencias: los padres antes que los hijos. */
 export const TABLAS = ['anio_lectivo', 'grado', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion', 'materia_grado'];
@@ -16,11 +17,12 @@ const CON_DATOS_DEL_DOCENTE = ['anio_lectivo', 'materia', 'estudiante', 'matricu
 
 /** @typedef {{ hoja: string, fila: number, columna: string | null, mensaje: string }} ErrorCelda */
 /** @typedef {Record<string, { nuevos: number, cambiados: number, iguales: number }>} Resumen */
+/** Cosas que el Excel cambiaría y que el docente conviene que sepa antes de confirmar. @typedef {{ aniosCerrados: number, fueraDeGrado: number }} Avisos */
 
 export class ErrorImportacion extends Error {
   /**
    * @param {'ARCHIVO'|'VERSION'|'INVALIDO'|'CONFIRMACION'|'OTRA_BASE'} codigo @param {string} mensaje
-   * @param {{ errores?: ErrorCelda[], resumen?: Resumen | null }} [extra]
+   * @param {{ errores?: ErrorCelda[], resumen?: Resumen | null, avisos?: Avisos | null }} [extra]
    */
   constructor(codigo, mensaje, extra = {}) {
     super(mensaje);
@@ -28,6 +30,7 @@ export class ErrorImportacion extends Error {
     this.codigo = codigo;
     this.errores = extra.errores ?? [];
     this.resumen = extra.resumen ?? null;
+    this.avisos = extra.avisos ?? null;
   }
 }
 
@@ -126,11 +129,14 @@ const FIN_SIMULACION = Symbol('fin-simulacion');
 /**
  * Recorre el libro. Con `aplicar` falso, todo se revierte al final. Siempre devuelve errores y resumen.
  * @param {import('node:sqlite').DatabaseSync} db @param {ExcelJS.Workbook} wb @param {boolean} aplicar
- * @returns {{ errores: ErrorCelda[], resumen: Resumen }}
+ * @returns {{ errores: ErrorCelda[], resumen: Resumen, avisos: Avisos }}
  */
 function procesar(db, wb, aplicar) {
   /** @type {ErrorCelda[]} */ const errores = [];
   /** @type {Resumen} */ const resumen = {};
+  /** @type {Avisos} */ const avisos = { aniosCerrados: 0, fueraDeGrado: 0 };
+  // Años cerrados ANTES de importar (el propio Excel puede reabrirlos al cargar la tabla de años).
+  const cerradosAntes = new Set(db.prepare('select id from anio_lectivo where cerrado = 1').all().map((x) => Number(x.id)));
   const version = Number(wb.getWorksheet('_version')?.getCell('B1').value);
   const antiguo = version < VERSION_ESQUEMA; // un respaldo de una versión anterior no tiene las tablas ni columnas añadidas después
   const conDatos = hayDatosDelDocente(db);
@@ -196,6 +202,11 @@ function procesar(db, wb, aplicar) {
           if (t === 'config' && (reg['clave'] === 'respaldo.carpeta_extra' || (reg['clave'] === 'base.id' && conDatos))) continue;
           const previo = /** @type {Record<string, any> | undefined} */ (buscar.get(reg[pk]));
           const estado = !previo ? 'nuevos' : cols.every((c) => previo[c.name] === reg[c.name]) ? 'iguales' : 'cambiados';
+          // La importación es una restauración y escribe lo que trae el Excel; se avisa de lo que toca un año cerrado o una materia fuera de su grado.
+          if (estado !== 'iguales' && (t === 'nota' || t === 'nivelacion')) {
+            const m = /** @type {{ anio_id: number, grado_id: number } | undefined} */ (db.prepare('select anio_id, grado_id from matricula where id = ?').get(reg['matricula_id']));
+            if (m) { if (cerradosAntes.has(Number(m.anio_id))) avisos.aniosCerrados++; if (!materiaEnGrado(db, Number(reg['materia_id']), m.grado_id)) avisos.fueraDeGrado++; }
+          }
           try {
             upsert.run(...cols.map((c) => reg[c.name]));
             resumen[t][estado]++;
@@ -209,7 +220,7 @@ function procesar(db, wb, aplicar) {
   } catch (e) {
     if (e !== FIN_SIMULACION) throw e;
   }
-  return { errores, resumen };
+  return { errores, resumen, avisos };
 }
 
 /**
@@ -236,7 +247,7 @@ export async function importarExcel(db, ruta, opciones = {}) {
   }
   const hayDatos = hayDatosDelDocente(db);
   if (hayDatos && !opciones.confirmar) {
-    throw new ErrorImportacion('CONFIRMACION', 'La base ya tiene datos. Revise el resumen y confirme para aplicar.', { resumen: simulacion.resumen });
+    throw new ErrorImportacion('CONFIRMACION', 'La base ya tiene datos. Revise el resumen y confirme para aplicar.', { resumen: simulacion.resumen, avisos: simulacion.avisos });
   }
   procesar(db, wb, true);
   return simulacion;

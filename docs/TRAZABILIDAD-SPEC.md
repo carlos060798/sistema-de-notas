@@ -1,6 +1,6 @@
 # Trazabilidad: criterios de la spec contra lo construido (2026-10-31)
 
-Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado a la versión `v0.1.5` (corregido tras la auditoría final independiente: el «33 de 33» anterior estaba sobrestimado).
+Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado a la versión `v0.1.6` (corregido tras la auditoría final independiente: el «33 de 33» anterior estaba sobrestimado).
 **Cumplido** = implementado y probado. **Con desviación** = se hace, pero distinto a como lo dice la spec (se explica). **Pendiente** = no hecho.
 
 | Criterio | Estado | Evidencia / nota |
@@ -36,12 +36,12 @@ Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado
 | CA-007-05 carpeta adicional (USB) | Cumplido | Revisión independiente |
 | CA-008-01 exportar todos los datos a `.xlsx` | **Con desviación** | El Excel NO incluye los archivos adjuntos de las guías (una celda de Excel no puede guardar archivos). Se compensa con «Descargar copia completa» (archivo .db con todo, adjuntos incluidos) y se avisa en las pantallas y en el LEEME. Tampoco lleva la carpeta de la memoria USB (es de cada equipo). |
 | CA-008-02 ida y vuelta idéntica | Cumplido | Incluye las tablas nuevas |
-| CA-008-03 importar sobre datos pide confirmación con resumen | Cumplido, con salvedad | Pide confirmación con resumen y hace copia antes; rechaza un Excel de otra base o sin identidad. Salvedad: al ser una restauración, la importación también escribe en años cerrados. |
+| CA-008-03 importar sobre datos pide confirmación con resumen | Cumplido, con salvedad | Pide confirmación con resumen y hace copia antes; rechaza un Excel de otra base o sin identidad. Salvedad: al ser una restauración, la importación también escribe en años cerrados y no valida los grados de las materias; desde v0.1.6 el resumen previo AVISA cuántas notas tocarían un año cerrado o una materia fuera de su grado. |
 | CA-008-04 Excel inválido o de otra versión se rechaza con detalle | Cumplido | |
 | CA-009-01 planilla xlsx y pdf | Cumplido | |
 | CA-009-02 boletín con notas, definitiva, nivelación y observaciones | Cumplido (nuevo: observaciones) | Botón «Observaciones» por estudiante |
 | CA-009-03 certificado con encabezado configurable | Cumplido | Formato provisional |
 | CA-009-04 tildes y eñes | Cumplido | PDF revisado a ojo; Word sin revisión visual |
 
-**Resumen:** 33 criterios; 29 cumplidos sin reservas, 3 cumplidos con salvedad (CA-001-01, CA-007-01, CA-008-03), 1 con desviación (CA-008-01), 0 pendientes. 159 pruebas.
+**Resumen:** 33 criterios; 29 cumplidos sin reservas, 3 cumplidos con salvedad (CA-001-01, CA-007-01, CA-008-03), 1 con desviación (CA-008-01), 0 pendientes. 164 pruebas.
 **Lo que ningún criterio cubre pero sigue sin verificar:** ejecución en el ASUS con Windows 10, los Word y el certificado a la vista, tres hallazgos bajos de la revisión independiente.

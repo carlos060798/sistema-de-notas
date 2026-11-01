@@ -137,3 +137,54 @@ test('copia completa: se descarga como archivo .db íntegro y se puede agregar a
   const mal = await fetch(url + '/api/respaldo/agregar', { method: 'POST', headers: H, body: Buffer.from('no soy una base') });
   assert.equal(mal.status, 400); assert.match((await mal.json()).error, /no sirve como copia/);
 });
+
+describe('importación de Excel: avisos antes de confirmar', () => {
+  /** Cambia la primera nota del libro. @param {ExcelJS.Workbook} wb */
+  const tocarNota = (wb) => { const n = /** @type {ExcelJS.Worksheet} */ (wb.getWorksheet('nota')); n.getRow(2).getCell(5).value = 4.4; }; // columna n1
+  test('avisa cuando una importación cambiaría notas de un año cerrado', async () => {
+    const a = prep(); const x = path.join(tmp(), 'a.xlsx'); await exportarExcel(a.db, x);
+    A.cerrarAnio(a.db, a.anio.id);
+    const r = await (await import('../src/excel/excel.js')).analizarExcel(a.db, await editar(x, tocarNota));
+    assert.equal(r.errores.length, 0); assert.equal(r.avisos.aniosCerrados, 1); assert.equal(r.avisos.fueraDeGrado, 0);
+  });
+  test('avisa cuando cambiaría notas de una materia en un grado donde hoy no se dicta', async () => {
+    const a = prep(); const x = path.join(tmp(), 'a.xlsx'); await exportarExcel(a.db, x);
+    A.guardarGradosMateria(a.db, a.mat.id, [3]);
+    const r = await (await import('../src/excel/excel.js')).analizarExcel(a.db, await editar(x, tocarNota));
+    assert.equal(r.avisos.fueraDeGrado, 1); assert.equal(r.avisos.aniosCerrados, 0);
+  });
+  test('sin cambios no hay avisos', async () => {
+    const a = prep(); const x = path.join(tmp(), 'a.xlsx'); await exportarExcel(a.db, x);
+    A.cerrarAnio(a.db, a.anio.id);
+    const r = await (await import('../src/excel/excel.js')).analizarExcel(a.db, x);
+    assert.deepEqual(r.avisos, { aniosCerrados: 0, fueraDeGrado: 0 });
+  });
+});
+
+test('no se puede restaurar una copia mientras se procesa un Excel (hallazgo bajo 9)', async () => {
+  const { crearCopia } = await import('../src/respaldo/respaldo.js');
+  const dir = tmp(); const db = abrirBase(path.join(dir, 'notas.db')); A.crearAnio(db, 2026);
+  const copias = path.join(dir, 'copias'); const copia = path.basename(crearCopia(db, copias, 'manual'));
+  const s = crearServidor({ db, rutaBase: path.join(dir, 'notas.db'), carpetaCopias: copias, retardoExcel: 600 });
+  const { url } = await s.escuchar(); aCerrar.push(() => s.cerrar());
+  const H = { 'x-token': s.token };
+  const x = path.join(tmp(), 'a.xlsx'); await exportarExcel(db, x);
+  const excel = fetch(url + '/api/excel/analizar', { method: 'POST', headers: H, body: fs.readFileSync(x) }); // queda «en curso» 600 ms
+  await new Promise((r) => setTimeout(r, 200));
+  const durante = await fetch(url + '/api/respaldo/restaurar', { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ nombre: copia }) });
+  assert.equal(durante.status, 400); assert.match((await durante.json()).error, /Excel procesándose/);
+  assert.equal((await excel).status, 200);
+  const despues = await fetch(url + '/api/respaldo/restaurar', { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ nombre: copia }) });
+  assert.equal(despues.status, 200); // ya terminó el Excel: ahora sí
+});
+
+test('certificado: fecha de expedición en palabras; plan de área: secciones con título para dibujarlas en negrita', async () => {
+  const { expedido } = await import('../src/reportes/formatos.js');
+  const { datosTexto } = await import('../src/reportes/datos.js');
+  assert.equal(expedido(new Date(2026, 9, 31)), 'Expedido el 31 de octubre de 2026.');
+  const { db, anio, mat } = prep();
+  const p = P.guardarPlan(db, { tipo: 'area', anio_id: anio.id, materia_id: mat.id, grado: 1, titulo: 'Área', objetivos: 'Uno', criterios: 'Dos' });
+  assert.deepEqual(datosTexto(db, 'plan', p.id).secciones, [['Objetivos', 'Uno'], ['Criterios de evaluación', 'Dos']]);
+  const g = P.guardarGuia(db, { materia_id: mat.id, grado: 1, titulo: 'G', contenido: 'x' });
+  assert.equal(datosTexto(db, 'guia', g.id).secciones, null);
+});

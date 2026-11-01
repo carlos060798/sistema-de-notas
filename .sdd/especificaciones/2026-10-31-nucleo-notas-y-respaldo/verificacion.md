@@ -28,3 +28,5 @@
 **v0.1.4:** cerradas las dos desviaciones de la spec (materias por grado; plan de área con campos separados): 33 de 33 criterios cumplidos (`docs/TRAZABILIDAD-SPEC.md`). Atendidos los tres hallazgos bajos de la revisión independiente (el del Excel en curso, sin prueba automática). 148 pruebas.
 
 **v0.1.5 — auditoría final independiente:** veredicto «piloto con condiciones», sin hallazgos críticos; los 3 altos y los medios están corregidos (reportes/2026-10-31-auditoria-final.md). La trazabilidad se corrigió: 29 criterios sin reservas, 3 con salvedad, 1 con desviación (CA-008-01: el Excel no guarda adjuntos; se compensa con la copia completa). 159 pruebas.
+
+**v0.1.6:** ventanas propias en lugar de prompt/confirm; avisos de importación (año cerrado, materia fuera de grado); prueba de restauración durante un Excel; certificado con fecha; PDF de boletín, certificado y plan vistos a ojo (los Word no, no hay Word en el equipo); hoja de validación con el docente (`docs/VALIDACION-DOCENTE.md`). 164 pruebas. Sigue pendiente la prueba en el ASUS y las decisiones del docente.

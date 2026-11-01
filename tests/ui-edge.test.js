@@ -104,7 +104,7 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await hasta(`document.getElementById('aviso').textContent`, 'Copia creada');
   // Año y materias: guardar los datos de la institución
   await menu('Año y materias');
-  await hasta(`document.querySelectorAll('input[type=text]').length > 2`, true);
+  await hasta(`!![...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar datos')`, true); // la pantalla «Año y materias» ya se dibujó
   await ev(`(() => { document.querySelectorAll('input[type=text]')[0].value = 'Escuela El Roble'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar datos').click(); })()`);
   await hasta(`document.getElementById('aviso').textContent`, 'Datos guardados');
   assert.equal((await (await fetch(`${app.url}/api/institucion`, { headers: { 'x-token': app.token } })).json()).institucion, 'Escuela El Roble');
@@ -126,7 +126,11 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   for (const per of [2, 3, 4]) await post('/api/notas', { matricula_id: beto.matricula_id, materia_id: mat.id, periodo: per, n1: 2, n2: 2, n3: 2 }, 'PUT');
   await menu('Nivelación');
   await hasta(`document.body.textContent.includes('Beto Pérez')`, true);
-  await ev(`(() => { const t = document.querySelector('section.tarjeta input.nota'); t.value = '3,4'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar').click(); })()`);
+  // Se reintenta el clic: si la pantalla se estaba redibujando, el primero puede caer en el vacío (guardar dos veces es inocuo).
+  for (let intento = 0; intento < 8 && (await ev(`document.getElementById('aviso').textContent`)) !== 'Nivelación registrada'; intento++) {
+    await ev(`(() => { const t = document.querySelector('section.tarjeta input.nota'); const b = [...document.querySelectorAll('button')].find((x) => x.textContent === 'Guardar'); if (t && b) { t.value = '3,4'; b.click(); } })()`);
+    await dormir(700);
+  }
   await hasta(`document.getElementById('aviso').textContent`, 'Nivelación registrada');
   assert.deepEqual(await (await fetch(`${app.url}/api/nivelaciones/pendientes?anio_id=${anio.id}`, { headers: { 'x-token': app.token } })).json(), []);
   // Apariencia: el botón cambia entre automática, clara y oscura
@@ -140,6 +144,7 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await hasta(`document.body.textContent.includes('Beto Pérez')`, true);
   // Asistencia: marcar a Ana como ausente y comprobarlo en la base
   await menu('Planeación');
+  await hasta(`!![...document.querySelectorAll('.pestanas button')].find((b) => b.textContent === 'Asistencia')`, true); // espera a que la pantalla se dibuje
   await ev(`[...document.querySelectorAll('.pestanas button')].find((b) => b.textContent === 'Asistencia').click()`);
   await hasta(`document.querySelectorAll('tbody select').length`, 2);
   await ev(`(() => { const s = document.querySelector('tbody select'); s.value = 'ausente'; s.dispatchEvent(new Event('change')); })()`);
@@ -150,6 +155,7 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
 
   // Plan de área con campos separados: se llena «Objetivos» y se guarda
   await menu('Planeación');
+  await hasta(`!![...document.querySelectorAll('.pestanas button')].find((b) => b.textContent === 'Planes de área y aula')`, true); // espera a que la pantalla se dibuje
   await ev(`[...document.querySelectorAll('.pestanas button')].find((b) => b.textContent === 'Planes de área y aula').click()`);
   await hasta(`document.querySelectorAll('textarea').length`, 9); // 8 campos del plan de área + «Otras notas»
   await ev(`(() => { document.querySelector('input[type=text]').value = 'Plan de transición'; document.querySelector('textarea').value = 'Contar hasta 20'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar plan').click(); })()`);
@@ -162,5 +168,22 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await hasta(`document.body.textContent.includes('Este grado no tiene materias')`, true);
   await menu('Año y materias');
   await hasta(`document.body.textContent.includes('Cuarto')`, true);
+
+  // Ventanas propias (no las del navegador): renombrar una materia y cancelar el cierre del año
+  const hayVentana = `!!document.querySelector('dialog.modal[open]')`;
+  const clicEnVentana = (/** @type {string} */ t) => ev(`[...document.querySelectorAll('dialog.modal button')].find((b) => b.textContent === ${JSON.stringify(t)}).click()`);
+  await hasta(`!![...document.querySelectorAll('button')].find((b) => b.textContent === 'Cambiar nombre')`, true);
+  await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Cambiar nombre').click()`);
+  await hasta(hayVentana, true);
+  await ev(`(() => { const i = document.querySelector('dialog.modal input'); i.value = 'Matemáticas básicas'; })()`);
+  await clicEnVentana('Aceptar');
+  await hasta(`document.getElementById('aviso').textContent`, 'Materia renombrada');
+  assert.equal((await (await fetch(`${app.url}/api/estado`, { headers: { 'x-token': app.token } })).json()).materias[0].nombre, 'Matemáticas básicas');
+  await hasta(`!![...document.querySelectorAll('button')].find((b) => b.textContent === 'Cerrar año')`, true);
+  await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Cerrar año').click()`);
+  await hasta(hayVentana, true);
+  await clicEnVentana('Cancelar');
+  await hasta(`!document.querySelector('dialog.modal')`, true);
+  assert.equal((await (await fetch(`${app.url}/api/estado`, { headers: { 'x-token': app.token } })).json()).anios[0].cerrado, 0); // cancelar no cierra el año
   assert.deepEqual(errores, []);
 });

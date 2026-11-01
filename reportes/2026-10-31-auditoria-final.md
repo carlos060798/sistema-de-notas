@@ -133,3 +133,11 @@ La conclusión «33 de 33» no se sostiene. Lo honesto es: CA-008-01 y CA-008-03
 | Trazabilidad «33 de 33» | Corregida: 29 sin reservas, 3 con salvedad, 1 con desviación. | `docs/TRAZABILIDAD-SPEC.md` |
 
 159 pruebas, tipos en 0.
+
+### Pendientes que quedaban, cerrados en v0.1.6
+- `prompt()` y `confirm()` del navegador reemplazados por ventanas propias (el foco empieza en «Cancelar» en las preguntas de borrar o cerrar). Probado en Edge real.
+- Importación de Excel: el resumen previo avisa cuántas notas tocarían un año cerrado o una materia fuera de su grado (`auditoria-final.test.js`).
+- Restauración durante un Excel en curso: ahora tiene prueba automática (opción `retardoExcel` solo para pruebas).
+- Certificado: fecha de expedición en palabras. Plan de área en PDF y Word: títulos de sección en negrita. PDF de boletín, certificado y plan revisados a la vista.
+- Hoja para validar las decisiones de calificación con el docente: `docs/VALIDACION-DOCENTE.md`.
+- Sin hacer: prueba en el ASUS con Windows 10; los Word no se pudieron ver (no hay Word ni LibreOffice en el equipo de desarrollo).
