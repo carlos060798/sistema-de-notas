@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { iniciar } from '../src/arranque.js';
 import { abrirBase } from '../src/datos/base.js';
+import { guardarCarpetaExtra } from '../src/respaldo/extra.js';
 import { listarCopias } from '../src/respaldo/respaldo.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'arr-'));
@@ -70,5 +71,41 @@ describe('arranque', () => {
     for (let i = 0; i < 100 && fs.existsSync(path.join(dir, 'notas.lock')); i++) await new Promise((r) => setTimeout(r, 100)); // hasta 10 s
     assert.equal(fs.existsSync(path.join(dir, 'notas.lock')), false);
     assert.ok(listarCopias(path.join(dir, 'copias')).some((c) => c.motivo === 'cerrar'));
+  });
+  test('si el equipo se suspende (el vigilante se retrasa), el programa NO se apaga', async () => {
+    const dir = tmp();
+    const app = await iniciar(opciones(dir, { latidoMaxMs: 300, revisarCadaMs: 40 }));
+    await fetch(app.url + '/api/latido', { method: 'POST', headers: { 'x-token': app.token } });
+    const fin = Date.now() + 700; while (Date.now() < fin) { /* bloquea el programa como una suspensión */ }
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(fs.existsSync(path.join(dir, 'notas.lock')), true);
+    await app.cerrar();
+  });
+  test('copia a una carpeta extra (USB) al cerrar; si no está disponible, el programa cierra igual', async () => {
+    const dir = tmp(); const usb = path.join(tmp(), 'USB', 'Respaldos');
+    const a = await iniciar(opciones(dir));
+    const H = { 'x-token': a.token, 'content-type': 'application/json' };
+    const g = await fetch(a.url + '/api/respaldo/extra', { method: 'PUT', headers: H, body: JSON.stringify({ carpeta: usb }) });
+    assert.equal(g.status, 200);
+    await a.cerrar();
+    assert.ok(listarCopias(usb).some((c) => c.motivo === 'cerrar'), 'no hay copia en la carpeta extra');
+    // ahora la «memoria» desaparece: cerrar no debe fallar
+    const b = await iniciar(opciones(dir));
+    fs.rmSync(path.dirname(usb), { recursive: true, force: true }); fs.writeFileSync(path.dirname(usb), 'archivo en lugar de carpeta');
+    await b.cerrar();
+    assert.equal(fs.existsSync(path.join(dir, 'notas.lock')), false);
+  });
+  test('carpeta extra: valida la ruta y permite quitarla', () => {
+    const db = abrirBase(':memory:');
+    assert.throws(() => guardarCarpetaExtra(db, 'Respaldos'), /ruta completa/);
+    const ok = path.join(tmp(), 'usb'); assert.equal(guardarCarpetaExtra(db, ok), ok);
+    assert.equal(guardarCarpetaExtra(db, ''), '');
+  });
+  test('dos arranques casi simultáneos: solo uno queda como programa; el otro se une a él', async () => {
+    const dir = tmp();
+    const [x, y] = await Promise.all([iniciar(opciones(dir)), iniciar(opciones(dir))]);
+    assert.equal([x, y].filter((a) => !a.yaEstabaAbierta).length, 1);
+    assert.equal(x.url, y.url);
+    await (x.yaEstabaAbierta ? y : x).cerrar();
   });
 });

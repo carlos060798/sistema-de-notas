@@ -129,6 +129,8 @@ export function abrirBase(ruta) {
       db.exec(`pragma user_version = ${v + 1}`);
     });
   }
+  // Identidad de esta base: el Excel la lleva, para no mezclar el respaldo de otra base por error.
+  db.exec("insert or ignore into config(clave, valor) values ('base.id', lower(hex(randomblob(16))))");
   return db;
 }
 

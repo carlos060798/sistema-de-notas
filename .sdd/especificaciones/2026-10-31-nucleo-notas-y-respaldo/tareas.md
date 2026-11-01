@@ -3,7 +3,7 @@
 ## F0 Sprint 0
 - [x] **T0.1** Constitución 1.0.0, spec aprobada, ADR-01 aceptada.
 - [x] **T0.2** Spikes S0.1 a S0.4 (sin la prueba visual de PDF/Word ni la del ASUS).
-- [ ] **T0.3** Revisión independiente de la spec y del plan.
+- [~] **T0.3** Revisión independiente de la spec y del plan: la revisión independiente hecha cubrió el código y las reglas de negocio, no una crítica formal del documento de spec/plan.
 
 ## F1 Dominio y datos
 - [x] **T1.1** `package.json`, `tsconfig` (`checkJs`), `node:test`. Prueba: `npm test` y `tsc` en 0. Hecho 2026-10-31.
@@ -40,4 +40,4 @@
 - [x] **T6.1** `esbuild` + SEA + GitHub Actions que publica el `.exe`.
 - [ ] **T6.2** Prueba en el ASUS con Windows 10: arranque, memoria, restauración.
 - [ ] **T6.3** Prueba visual de PDF y Word.
-- [ ] **T6.4** Revisión independiente, suite completa, `verificacion.md`.
+- [x] **T6.4** Revisión independiente (informe en reportes/2026-10-31-revision-independiente.md; altos y medios atendidos, 3 bajos pendientes), suite completa, verificacion.md.

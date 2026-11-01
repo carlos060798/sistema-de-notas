@@ -9,12 +9,13 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { abrirBase, VERSION_ESQUEMA } from '../datos/base.js';
 import {
-  ErrorValidacion, crearAnio, cerrarAnio, listarAnios, crearMateria, listarMaterias,
+  ErrorValidacion, crearAnio, cerrarAnio, reabrirAnio, listarAnios, crearMateria, listarMaterias,
   crearEstudiante, editarEstudiante, renombrarMateria, archivarEstudiante, listarEstudiantes,
   guardarNotas, listarNotas, desaprobadas, guardarNivelacion, pendientesNivelacion,
 } from '../servicios/academico.js';
 import { resumen, registrarExcelDescargado } from '../servicios/resumen.js';
 import * as PL from '../servicios/planeacion.js';
+import { leerCarpetaExtra, guardarCarpetaExtra, copiarAExtra } from '../respaldo/extra.js';
 import { crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
 import { datosPlanilla, datosBoletin, datosTexto, guardarInstitucion, encabezado } from '../reportes/datos.js';
 import * as FM from '../reportes/formatos.js';
@@ -118,6 +119,7 @@ export function crearServidor(opciones) {
     { metodo: 'POST', patron: /^\/api\/latido$/, cuerpo: null, libre: true, h: () => { ctx.ultimoLatido = Date.now(); return { json: { ok: true } }; } },
 
     { metodo: 'POST', patron: /^\/api\/anios$/, cuerpo: 'json', h: ({ b }) => ({ json: crearAnio(bd(), b?.anio) }) },
+    { metodo: 'POST', patron: /^\/api\/anios\/(\d+)\/reabrir$/, cuerpo: null, h: ({ p }) => { reabrirAnio(bd(), Number(p[0])); return { json: { ok: true } }; } },
     { metodo: 'POST', patron: /^\/api\/anios\/(\d+)\/cerrar$/, cuerpo: null, h: ({ p }) => { cerrarAnio(bd(), Number(p[0])); return { json: { ok: true } }; } },
     { metodo: 'GET', patron: /^\/api\/resumen$/, cuerpo: null, h: ({ q }) => ({ json: resumen(bd(), { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), copias: ctx.carpetaCopias ? listarCopias(ctx.carpetaCopias) : [] }) }) },
     { metodo: 'GET', patron: /^\/api\/institucion$/, cuerpo: null, h: () => ({ json: encabezado(bd()) }) },
@@ -168,7 +170,9 @@ export function crearServidor(opciones) {
 
     { metodo: 'GET', patron: /^\/api\/respaldo$/, cuerpo: null, libre: true, h: () => ({
       json: ctx.carpetaCopias ? listarCopias(ctx.carpetaCopias).map((c) => ({ nombre: c.nombre, motivo: c.motivo })) : [] }) },
-    { metodo: 'POST', patron: /^\/api\/respaldo$/, cuerpo: null, h: () => ({ json: { nombre: path.basename(crearCopia(bd(), carpeta(), 'manual')) } }) },
+    { metodo: 'POST', patron: /^\/api\/respaldo$/, cuerpo: null, h: () => ({ json: { nombre: path.basename(crearCopia(bd(), carpeta(), 'manual')), extra: copiarAExtra(bd(), 'manual', 30) } }) },
+    { metodo: 'GET', patron: /^\/api\/respaldo\/extra$/, cuerpo: null, h: () => ({ json: { carpeta: leerCarpetaExtra(bd()) } }) },
+    { metodo: 'PUT', patron: /^\/api\/respaldo\/extra$/, cuerpo: 'json', h: ({ b }) => ({ json: { carpeta: guardarCarpetaExtra(bd(), b?.carpeta) } }) },
     { metodo: 'POST', patron: /^\/api\/respaldo\/restaurar$/, cuerpo: 'json', h: ({ b }) => { restaurarCopia(copiaPorNombre(b?.nombre).ruta); return { json: { ok: true } }; } },
 
     { metodo: 'GET', patron: /^\/api\/recuperacion$/, cuerpo: null, libre: true, h: () => {

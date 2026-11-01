@@ -154,6 +154,7 @@ async function pantallaNotas(cont) {
 }
 
 function filaNotas(f, alCambiarResumen) {
+  const ctx = { anio: sel.anio, grado: sel.grado, materia: sel.materia, periodo: sel.periodo }; // aunque cambien los selectores, esta fila guarda en SU periodo y materia
   const entradas = ['n1', 'n2', 'n3'].map((k) => h('input', { class: 'nota', type: 'text', inputmode: 'decimal', value: fmt2(f[k]), 'aria-label': `${k.replace('n', 'Nota ')} de ${f.nombre}` }));
   const marcarVacias = () => entradas.forEach((e) => e.classList.toggle('vacia', e.value.trim() === ''));
   const celdaDef = h('td'); const celdaEstado = h('td'); const celdaAnio = h('td', { class: 'sin-partir' });
@@ -177,10 +178,10 @@ function filaNotas(f, alCambiarResumen) {
     if (valores.some((v) => Number.isNaN(v))) { aviso('Escriba solo números, por ejemplo 4,5', true); return; }
     if (mala.some(Boolean)) { aviso('La nota debe estar entre 1,0 y 5,0', true); return; }
     await intentar(async () => {
-      const r = await json('PUT', '/api/notas', { matricula_id: f.matricula_id, materia_id: sel.materia, periodo: sel.periodo, n1: valores[0], n2: valores[1], n3: valores[2] });
+      const r = await json('PUT', '/api/notas', { matricula_id: f.matricula_id, materia_id: ctx.materia, periodo: ctx.periodo, n1: valores[0], n2: valores[1], n3: valores[2] });
       f.n1 = valores[0]; f.n2 = valores[1]; f.n3 = valores[2]; f.definitiva = r.definitiva; f.aprobado = r.aprobado;
       entradas.forEach((e, i) => { if (e.value === textos[i]) e.value = fmt2(valores[i]); }); // no pisar lo escrito mientras se guardaba
-      const datos = await json('GET', `/api/notas?anio_id=${sel.anio}&grado=${sel.grado}&materia_id=${sel.materia}&periodo=${sel.periodo}`);
+      const datos = await json('GET', `/api/notas?anio_id=${ctx.anio}&grado=${ctx.grado}&materia_id=${ctx.materia}&periodo=${ctx.periodo}`);
       f.anio = datos.find((d) => d.matricula_id === f.matricula_id).anio;
       pintar(); alCambiarResumen(); aviso('Guardado');
     });
@@ -311,6 +312,13 @@ async function descargarExcel() {
 
 async function pantallaCopias(cont) {
   const copias = await json('GET', '/api/respaldo');
+  const extra = (await json('GET', '/api/respaldo/extra')).carpeta;
+  const campoExtra = h('input', { type: 'text', value: extra, placeholder: 'Por ejemplo E:\\Respaldos', 'aria-label': 'Carpeta extra para las copias', autocomplete: 'off' });
+  const tarjetaExtra = h('section', { class: 'tarjeta' }, h('h2', {}, 'Copia también en una memoria USB'),
+    h('p', { class: 'suave' }, 'Si escribe aquí una carpeta de su memoria USB, cada vez que cierre el programa se guardará allí otra copia. Si el computador se daña, la copia sigue a salvo.'),
+    h('div', { class: 'fila' }, h('label', { class: 'ancha' }, 'Carpeta (ruta completa)', campoExtra),
+      h('button', { class: 'principal', onclick: () => intentar(async () => { const r = await json('PUT', '/api/respaldo/extra', { carpeta: campoExtra.value }); aviso(r.carpeta ? 'Se guardará una copia también en ' + r.carpeta : 'Ya no se hace copia en otra carpeta'); mostrar(); }) }, 'Guardar carpeta')),
+    extra ? h('p', { class: 'suave' }, 'Carpeta actual: ' + extra) : h('p', { class: 'vacio' }, 'Todavía no hay carpeta extra: las copias están solo en este computador.'));
   const lista = h('ul', { class: 'sin-vinetas' }, copias.slice(0, 15).map((c) => h('li', {},
     h('span', {}, etiquetaCopia(c)),
     h('button', { class: 'peligro', onclick: () => {
@@ -329,14 +337,15 @@ async function pantallaCopias(cont) {
   };
   cont.replaceChildren(
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Excel: su seguro de vida'),
-      h('p', { class: 'suave' }, 'Descargue todo en un Excel y guárdelo en una memoria USB. Si el programa se daña, con ese archivo recupera todo.'),
+      h('p', { class: 'suave' }, 'Descargue todo en un Excel y guárdelo en una memoria USB. Si el programa se daña, con ese archivo recupera sus datos. Los archivos adjuntos de las guías no van en el Excel: esos quedan en las copias de seguridad.'),
       h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: descargarExcel }, 'Descargar todo en Excel')),
       h('h3', {}, 'Recuperar desde un Excel'),
       h('div', { class: 'fila-acciones' }, archivo, h('button', { class: 'secundario', onclick: analizar }, 'Revisar archivo')),
       resultado),
+    tarjetaExtra,
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Copias de seguridad'),
       h('p', { class: 'suave' }, 'El programa hace una copia sola al abrirse y al cerrarse. Aquí puede hacer una copia ahora.'),
-      h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: () => intentar(async () => { await json('POST', '/api/respaldo'); aviso('Copia creada'); mostrar(); }) }, 'Crear copia ahora')),
+      h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: () => intentar(async () => { const c = await json('POST', '/api/respaldo'); if (c.extra.estado === 'fallo') aviso('Copia creada, pero ' + c.extra.mensaje, true); else aviso(c.extra.estado === 'ok' ? 'Copia creada. ' + c.extra.mensaje : 'Copia creada'); mostrar(); }) }, 'Crear copia ahora')),
       copias.length ? lista : h('p', { class: 'vacio' }, 'Aún no hay copias.')));
 }
 
@@ -383,7 +392,7 @@ async function pantallaConfig(cont) {
       h('form', { onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('POST', '/api/anios', { anio: Number(anio.value) }); aviso('Año creado'); mostrar(); }); } },
         h('label', {}, 'Año', anio), h('button', { class: 'principal', type: 'submit' }, 'Crear año')),
       h('ul', { class: 'sin-vinetas' }, estado.anios.map((a) => h('li', {}, h('span', {}, `${a.anio}${a.cerrado ? ' — cerrado (solo consulta)' : ''}`),
-        a.cerrado ? null : h('button', { class: 'peligro', onclick: () => {
+        a.cerrado ? h('button', { class: 'secundario', onclick: () => { if (confirm(`¿Reabrir el año ${a.anio}? Podrá volver a escribir y cambiar datos de ese año.`)) intentar(async () => { await json('POST', `/api/anios/${a.id}/reabrir`); aviso('Año reabierto'); mostrar(); }); } }, 'Reabrir año') : h('button', { class: 'peligro', onclick: () => {
           if (confirm(`¿Cerrar el año ${a.anio}?\n\nDespués no podrá escribir ni cambiar notas, temas, clases ni planes de ese año: solo consultarlos. Descargue antes su Excel de respaldo.`)) intentar(async () => { await json('POST', `/api/anios/${a.id}/cerrar`); mostrar(); });
         } }, 'Cerrar año'))))),
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Materias'),
@@ -559,7 +568,7 @@ async function pantallaInicio(cont) {
       h('div', { class: 'fila' }, selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }))),
     rp.avisarExcel ? h('section', { class: 'tarjeta recuperacion' }, h('h2', {}, 'Haga hoy su copia en Excel'),
       h('p', {}, rp.ultimoExcel ? 'Hace más de dos semanas que no descarga el Excel de respaldo.' : 'Todavía no ha descargado el Excel de respaldo.'),
-      h('p', { class: 'suave' }, 'Es su seguro de vida: guárdelo también en una memoria USB. Si el computador se daña, con ese archivo recupera todo.'),
+      h('p', { class: 'suave' }, 'Es su seguro de vida: guárdelo también en una memoria USB. Si el computador se daña, con ese archivo recupera sus datos (los archivos adjuntos de las guías solo van en las copias de seguridad).'),
       botonExcel) : null,
     h('div', { class: 'rejilla' },
       dato('', r.estudiantes, r.estudiantes === 1 ? 'estudiante' : 'estudiantes', h('span', { class: 'suave' }, r.porGrado.map((g) => `${NOMBRE_GRADO[g.grado]}: ${g.n}`).join(' · ') || 'Aún no hay estudiantes')),

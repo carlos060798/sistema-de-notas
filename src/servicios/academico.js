@@ -44,6 +44,11 @@ export function cerrarAnio(db, id) {
   if (!uno(db, 'select 1 x from anio_lectivo where id = ?', id)) throw new ErrorValidacion('El año lectivo no existe');
   db.prepare('update anio_lectivo set cerrado = 1 where id = ?').run(id);
 }
+/** Vuelve a abrir un año cerrado (por ejemplo, para registrar una nivelación que quedó pendiente). @param {Db} db @param {number} id */
+export function reabrirAnio(db, id) {
+  if (!uno(db, 'select 1 x from anio_lectivo where id = ?', id)) throw new ErrorValidacion('El año lectivo no existe');
+  db.prepare('update anio_lectivo set cerrado = 0 where id = ?').run(id);
+}
 /** @param {Db} db @param {number} anioId */
 export function exigirAnioAbierto(db, anioId) {
   const a = f(uno(db, 'select anio, cerrado from anio_lectivo where id = ?', anioId));

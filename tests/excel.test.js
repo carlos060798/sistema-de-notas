@@ -66,10 +66,29 @@ describe('ida y vuelta (CA-008-02)', () => {
   });
 });
 
+describe('Excel de otra base (hallazgo de la revisión independiente)', () => {
+  test('con datos propios, un Excel de OTRA base no se importa ni se analiza y no cambia nada', async () => {
+    const a = abrirBase(':memory:'); sembrar(a); const f = path.join(tmp(), 'r.xlsx'); await exportarExcel(a, f);
+    const b = abrirBase(':memory:'); b.exec("insert into materia(nombre) values ('Español')");
+    const antes = volcado(b);
+    await assert.rejects(importarExcel(b, f, { confirmar: true }), (e) => e instanceof ErrorImportacion && e.codigo === 'OTRA_BASE');
+    await assert.rejects(analizarExcel(b, f), (e) => e instanceof ErrorImportacion && e.codigo === 'OTRA_BASE');
+    assert.equal(volcado(b), antes);
+  });
+  test('en una base vacía sí se importa y la base adopta la identidad del respaldo', async () => {
+    const a = abrirBase(':memory:'); sembrar(a); const f = path.join(tmp(), 'r.xlsx'); await exportarExcel(a, f);
+    const b = abrirBase(':memory:');
+    await importarExcel(b, f);
+    assert.equal(b.prepare("select valor from config where clave = 'base.id'").get()?.valor, a.prepare("select valor from config where clave = 'base.id'").get()?.valor);
+    assert.equal(b.prepare('select count(*) n from estudiante').get()?.n, a.prepare('select count(*) n from estudiante').get()?.n);
+  });
+});
+
 describe('importar sobre datos existentes (CA-008-03)', () => {
   test('sin confirmar, no cambia nada y pide confirmación con el resumen', async () => {
     const a = abrirBase(':memory:'); sembrar(a); const f = path.join(tmp(), 'r.xlsx'); await exportarExcel(a, f);
     const b = abrirBase(':memory:'); b.exec("insert into materia(nombre) values ('Otra')");
+    b.prepare("update config set valor = ? where clave = 'base.id'").run(String(a.prepare("select valor from config where clave = 'base.id'").get()?.valor)); // misma base
     const antes = volcado(b);
     await assert.rejects(importarExcel(b, f), (e) => e instanceof ErrorImportacion && e.codigo === 'CONFIRMACION' && !!e.resumen);
     assert.equal(volcado(b), antes);

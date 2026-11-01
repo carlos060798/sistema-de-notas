@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { abrirBase } from './datos/base.js';
 import { crearCopia, aplicarRetencion, diagnosticar } from './respaldo/respaldo.js';
 import { crearServidor } from './servidor/servidor.js';
+import { copiarAExtra } from './respaldo/extra.js';
 
 /** Navegadores con modo «aplicación» (ventana sin barra), en orden de preferencia. */
 function candidatosNavegador() {
@@ -52,7 +53,7 @@ export async function iniciar(o) {
   const rutaBase = path.join(carpetaDatos, 'notas.db');
   const carpetaCopias = path.join(carpetaDatos, 'copias');
   const rutaLock = path.join(carpetaDatos, 'notas.lock');
-  const retencion = o.retencion ?? 10;
+  const retencion = o.retencion ?? 30; // unas 15 sesiones de uso (una copia al abrir y otra al cerrar)
   const ventana = o.abrirVentana ?? true;
   fs.mkdirSync(carpetaDatos, { recursive: true });
 
@@ -64,6 +65,7 @@ export async function iniciar(o) {
       if (ventana) abrirVentana(previo.url);
       return { url: previo.url, token: '', yaEstabaAbierta: true, modo: 'ok', cerrar: async () => {} };
     }
+    fs.rmSync(rutaLock, { force: true }); // el archivo era de un programa que ya no responde
   }
 
   const diag = diagnosticar(rutaBase, carpetaCopias);
@@ -79,7 +81,14 @@ export async function iniciar(o) {
     leerRecurso: o.leerRecurso,
   });
   const { url } = await servidor.escuchar();
-  fs.writeFileSync(rutaLock, JSON.stringify({ url, pid: process.pid }));
+  // El archivo de instancia se crea de forma atómica ('wx'): si otro arranque casi simultáneo ganó, este se retira.
+  try { fs.writeFileSync(rutaLock, JSON.stringify({ url, pid: process.pid }), { flag: 'wx' }); }
+  catch {
+    let otro = null; try { otro = JSON.parse(fs.readFileSync(rutaLock, 'utf8')); } catch { /* ilegible */ }
+    await servidor.cerrar(); db?.close();
+    if (otro?.url) { if (ventana) abrirVentana(otro.url); return { url: otro.url, token: '', yaEstabaAbierta: true, modo: 'ok', cerrar: async () => {} }; }
+    throw new Error('No se pudo reservar el programa: otro arranque está en curso. Intente de nuevo en unos segundos.');
+  }
   if (ventana) abrirVentana(url);
 
   let cerrado = false;
@@ -90,6 +99,7 @@ export async function iniciar(o) {
     try {
       if (servidor.ctx.db && servidor.ctx.modo === 'ok') {
         crearCopia(servidor.ctx.db, carpetaCopias, 'cerrar'); aplicarRetencion(carpetaCopias, retencion);
+        const extra = copiarAExtra(servidor.ctx.db, 'cerrar', retencion); if (extra.estado === 'fallo') console.error(extra.mensaje);
         servidor.ctx.db.close();
       }
     } finally {
@@ -98,11 +108,18 @@ export async function iniciar(o) {
     }
   };
   // Sin ventana no hay quien use el programa: si dejan de llegar latidos, se apaga solo.
-  const latidoMaxMs = o.latidoMaxMs ?? 30_000;
+  // El navegador frena los temporizadores de una ventana minimizada (a uno por minuto) y el equipo puede suspenderse:
+  // por eso el margen es amplio y, si el propio vigilante se retrasó (suspensión), se da un nuevo plazo en vez de apagar.
+  const latidoMaxMs = o.latidoMaxMs ?? 150_000;
+  const cada = o.revisarCadaMs ?? 5000;
+  let ultimaRevision = Date.now();
   const vigilante = setInterval(() => {
+    const ahora = Date.now();
+    if (ahora - ultimaRevision > cada * 3) { servidor.ctx.ultimoLatido = servidor.ctx.ultimoLatido ? ahora : servidor.ctx.ultimoLatido; ultimaRevision = ahora; return; }
+    ultimaRevision = ahora;
     const l = servidor.ctx.ultimoLatido;
     if (l && Date.now() - l > latidoMaxMs) { cerrar().then(() => process.emit('notas:cerrado' /** @type {any} */)); }
-  }, o.revisarCadaMs ?? 5000);
+  }, cada);
   vigilante.unref();
   return { url, token: servidor.token, yaEstabaAbierta: false, modo: servidor.ctx.modo, cerrar };
 }

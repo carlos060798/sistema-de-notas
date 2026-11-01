@@ -167,13 +167,17 @@ describe('respaldo y Excel por la API', () => {
   test('importar sobre datos pide confirmación (409 con resumen) y un archivo malo da 422', async () => {
     const a = await levantar(); await a.api('POST', '/api/materias', { nombre: 'Sociales' });
     const bytes = Buffer.from(await (await fetch(a.url + '/api/excel', { headers: { 'x-token': a.s.token } })).arrayBuffer());
-    const b = await levantar(); await b.api('POST', '/api/materias', { nombre: 'Otra' });
+    const b = a; await b.api('POST', '/api/materias', { nombre: 'Otra' }); // la misma base, con cambios posteriores al respaldo
     const r = await fetch(b.url + '/api/excel/importar', { method: 'POST', headers: { 'x-token': b.s.token }, body: bytes });
     assert.equal(r.status, 409); assert.ok((await r.json()).resumen);
     const ok = await fetch(b.url + '/api/excel/importar?confirmar=1', { method: 'POST', headers: { 'x-token': b.s.token }, body: bytes });
     assert.equal(ok.status, 200);
     const malo = await fetch(b.url + '/api/excel/importar?confirmar=1', { method: 'POST', headers: { 'x-token': b.s.token }, body: Buffer.from('no soy un excel') });
     assert.equal(malo.status, 422);
+    // un respaldo de OTRA base no se importa sobre una con datos
+    const c = await levantar(); await c.api('POST', '/api/materias', { nombre: 'Ajena' });
+    const otra = await fetch(c.url + '/api/excel/importar?confirmar=1', { method: 'POST', headers: { 'x-token': c.s.token }, body: bytes });
+    assert.equal(otra.status, 422); assert.equal((await otra.json()).codigo, 'OTRA_BASE');
   });
 });
 

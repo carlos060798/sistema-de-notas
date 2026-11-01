@@ -20,3 +20,5 @@
 **Validaciones pendientes con el docente:** redondeo mitad hacia arriba; aprobar sobre el valor redondeado (2,96 → 3,0 aprueba); notas con hasta 2 decimales; nivelación por definitiva del año; retención de 10 copias; formato del certificado; datos de la institución.
 
 **Actualización (adjuntos y pantalla):** las guías admiten adjuntos (pdf, Word, Excel, PowerPoint, png, jpg, txt; máx. 15 MB). Quedan dentro de la base y por eso viajan en cada copia de seguridad, **pero no en el Excel de respaldo** (no guarda archivos): quien solo tenga el Excel recupera el texto de las guías, no sus archivos. Materias renombrables, nota fuera de rango marcada en la casilla, modo claro/oscuro/automático, Nivelación probada en navegador real. 120 pruebas.
+
+**Revisión independiente (T6.4): realizada** por un agente distinto del que construyó (reportes/2026-10-31-revision-independiente.md). Hallazgos altos y medios corregidos el mismo día (ver «Respuesta del equipo» en el informe); quedan 3 bajos sin atender. Copia a USB (CA-007-05) ahora implementada. 127 pruebas.

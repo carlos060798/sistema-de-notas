@@ -19,7 +19,7 @@ const CON_DATOS_DEL_DOCENTE = ['anio_lectivo', 'materia', 'estudiante', 'matricu
 
 export class ErrorImportacion extends Error {
   /**
-   * @param {'ARCHIVO'|'VERSION'|'INVALIDO'|'CONFIRMACION'} codigo @param {string} mensaje
+   * @param {'ARCHIVO'|'VERSION'|'INVALIDO'|'CONFIRMACION'|'OTRA_BASE'} codigo @param {string} mensaje
    * @param {{ errores?: ErrorCelda[], resumen?: Resumen | null }} [extra]
    */
   constructor(codigo, mensaje, extra = {}) {
@@ -45,6 +45,7 @@ export async function exportarExcel(db, ruta) {
   const v = wb.addWorksheet('_version');
   v.addRow(['esquema', VERSION_ESQUEMA]);
   v.addRow(['programa', 'sistema-de-notas']);
+  v.addRow(['base_id', idDeBase(db) ?? '']);
   for (const t of TABLAS) {
     const ws = wb.addWorksheet(t);
     const cols = columnasDe(db, t).map((c) => c.name);
@@ -53,6 +54,28 @@ export async function exportarExcel(db, ruta) {
   }
   fs.mkdirSync(path.dirname(ruta), { recursive: true });
   await wb.xlsx.writeFile(ruta);
+}
+
+/** Identidad de la base (la crea abrirBase). @param {import('node:sqlite').DatabaseSync} db */
+function idDeBase(db) {
+  const f = /** @type {{ valor: string } | undefined} */ (db.prepare("select valor from config where clave = 'base.id'").get());
+  return f?.valor ?? null;
+}
+/** ¿La base tiene datos del docente? (el código de identidad no cuenta). @param {import('node:sqlite').DatabaseSync} db */
+function hayDatosDelDocente(db) {
+  return CON_DATOS_DEL_DOCENTE.some((t) => Number(db.prepare(t === 'config' ? "select count(*) n from config where clave <> 'base.id'" : `select count(*) n from ${t}`).get()?.n) > 0);
+}
+/**
+ * Si el Excel viene de OTRA base y esta ya tiene datos, no se importa: se emparejan los registros por número
+ * interno y se pisarían personas o materias distintas. (Un Excel sin código es de una versión anterior: se acepta.)
+ * @param {import('node:sqlite').DatabaseSync} db @param {ExcelJS.Workbook} wb
+ */
+function exigirMismaBase(db, wb) {
+  const v = wb.getWorksheet('_version');
+  const delExcel = v ? String(v.getCell('B3').value ?? '') : '';
+  if (v?.getCell('A3').value === 'base_id' && delExcel && delExcel !== idDeBase(db) && hayDatosDelDocente(db)) {
+    throw new ErrorImportacion('OTRA_BASE', 'Este Excel es el respaldo de OTRA base de datos, no de la que está abierta. Para no mezclar ni pisar estudiantes distintos, no se importó nada. Para usarlo, abra el programa en una carpeta de datos nueva (vacía) e impórtelo allí.');
+  }
 }
 
 /** @param {string} ruta */
@@ -178,7 +201,9 @@ function procesar(db, wb, aplicar) {
  * @param {import('node:sqlite').DatabaseSync} db @param {string} ruta
  */
 export async function analizarExcel(db, ruta) {
-  return procesar(db, await leerLibro(ruta), false);
+  const wb = await leerLibro(ruta);
+  exigirMismaBase(db, wb);
+  return procesar(db, wb, false);
 }
 
 /**
@@ -188,11 +213,12 @@ export async function analizarExcel(db, ruta) {
  */
 export async function importarExcel(db, ruta, opciones = {}) {
   const wb = await leerLibro(ruta);
+  exigirMismaBase(db, wb);
   const simulacion = procesar(db, wb, false);
   if (simulacion.errores.length) {
     throw new ErrorImportacion('INVALIDO', `El Excel tiene ${simulacion.errores.length} problema(s); no se cambió nada.`, simulacion);
   }
-  const hayDatos = CON_DATOS_DEL_DOCENTE.some((t) => Number(db.prepare(`select count(*) n from ${t}`).get()?.n) > 0);
+  const hayDatos = hayDatosDelDocente(db);
   if (hayDatos && !opciones.confirmar) {
     throw new ErrorImportacion('CONFIRMACION', 'La base ya tiene datos. Revise el resumen y confirme para aplicar.', { resumen: simulacion.resumen });
   }
