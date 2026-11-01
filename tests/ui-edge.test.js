@@ -93,7 +93,7 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await hasta(`[...document.querySelectorAll('tbody tr')].map((t) => t.children[0].textContent).join('|')`, 'Transición (0) — 2 estudiantes|Ana Ñañez|Beto Pérez'); // una fila de grupo por grado
   assert.equal(await ev(`[...document.querySelectorAll('tbody button')].filter((b) => b.textContent === 'Boletín PDF').length`), 2);
   // Copias: crear una copia ahora
-  await menu('Copias y Excel');
+  await menu('Respaldo');
   await hasta(`!![...document.querySelectorAll('button')].find((b) => b.textContent === 'Crear copia ahora')`, true);
   await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Crear copia ahora').click()`);
   await hasta(`document.getElementById('aviso').textContent`, 'Copia creada');
@@ -103,5 +103,17 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await ev(`(() => { document.querySelectorAll('input[type=text]')[0].value = 'Escuela El Roble'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar datos').click(); })()`);
   await hasta(`document.getElementById('aviso').textContent`, 'Datos guardados');
   assert.equal((await (await fetch(`${app.url}/api/institucion`, { headers: { 'x-token': app.token } })).json()).institucion, 'Escuela El Roble');
+
+  // Inicio: resumen y aviso de respaldo (nunca se ha descargado el Excel)
+  await menu('Hoy');
+  await hasta(`document.querySelector('h2') && !!document.body.textContent.includes('Haga hoy su copia en Excel')`, true);
+  assert.equal(await ev(`document.querySelector('.dato .cifra').textContent`), '2'); // estudiantes
+  assert.equal(await ev(`document.querySelectorAll('.dato .cifra')[1].textContent`), '0'); // con un solo periodo aún nadie pierde el año
+  // Flechas arriba/abajo en Notas pasan a la misma columna de la fila vecina
+  await menu('Notas');
+  await hasta(`document.querySelectorAll('tbody tr').length`, 2);
+  await ev(`document.querySelectorAll('tbody tr')[0].querySelectorAll('input.nota')[1].focus()`);
+  await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))`);
+  assert.equal(await ev(`document.activeElement === document.querySelectorAll('tbody tr')[1].querySelectorAll('input.nota')[1]`), true);
   assert.deepEqual(errores, []);
 });

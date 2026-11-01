@@ -13,6 +13,7 @@ import {
   crearEstudiante, editarEstudiante, archivarEstudiante, listarEstudiantes,
   guardarNotas, listarNotas, desaprobadas, guardarNivelacion, pendientesNivelacion,
 } from '../servicios/academico.js';
+import { resumen, registrarExcelDescargado } from '../servicios/resumen.js';
 import * as PL from '../servicios/planeacion.js';
 import { crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
 import { datosPlanilla, datosBoletin, datosTexto, guardarInstitucion, encabezado } from '../reportes/datos.js';
@@ -118,6 +119,7 @@ export function crearServidor(opciones) {
 
     { metodo: 'POST', patron: /^\/api\/anios$/, cuerpo: 'json', h: ({ b }) => ({ json: crearAnio(bd(), b?.anio) }) },
     { metodo: 'POST', patron: /^\/api\/anios\/(\d+)\/cerrar$/, cuerpo: null, h: ({ p }) => { cerrarAnio(bd(), Number(p[0])); return { json: { ok: true } }; } },
+    { metodo: 'GET', patron: /^\/api\/resumen$/, cuerpo: null, h: ({ q }) => ({ json: resumen(bd(), { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), copias: ctx.carpetaCopias ? listarCopias(ctx.carpetaCopias) : [] }) }) },
     { metodo: 'GET', patron: /^\/api\/institucion$/, cuerpo: null, h: () => ({ json: encabezado(bd()) }) },
     { metodo: 'PUT', patron: /^\/api\/institucion$/, cuerpo: 'json', h: ({ b }) => { guardarInstitucion(bd(), b ?? {}); return { json: encabezado(bd()) }; } },
     { metodo: 'POST', patron: /^\/api\/materias$/, cuerpo: 'json', h: ({ b }) => ({ json: crearMateria(bd(), b?.nombre) }) },
@@ -176,6 +178,7 @@ export function crearServidor(opciones) {
       const tmp = path.join(os.tmpdir(), `notas-xlsx-${crypto.randomUUID()}.xlsx`);
       try {
         await exportarExcel(bd(), tmp);
+        registrarExcelDescargado(bd());
         return { raw: fs.readFileSync(tmp), headers: {
           'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'content-disposition': `attachment; filename="respaldo-notas-${hoy()}.xlsx"` } };

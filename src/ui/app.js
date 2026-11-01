@@ -11,7 +11,10 @@ const fmt2 = (v) => (v === null || v === undefined ? '' : nf2.format(v));
 
 let estado = { modo: 'ok', anios: [], materias: [], grados: [0, 1, 2, 3, 4, 5] };
 const sel = { anio: null, grado: 0, materia: null, periodo: 1 };
-let vista = 'notas';
+let vista = 'inicio';
+// El año, grado, materia y periodo elegidos se recuerdan entre pantallas y al volver a abrir el programa.
+try { Object.assign(sel, JSON.parse(localStorage.getItem('notas.sel') ?? '{}')); } catch { /* sin almacenamiento: se usan los valores iniciales */ }
+const guardarSel = () => { try { localStorage.setItem('notas.sel', JSON.stringify(sel)); } catch { /* no es grave */ } };
 
 
 // --- Utilidades ---------------------------------------------------------------------------------
@@ -80,8 +83,8 @@ async function cargarEstado() {
 // --- Navegación ---------------------------------------------------------------------------------
 
 const VISTAS = [
-  ['notas', 'Notas'], ['estudiantes', 'Estudiantes'], ['nivelacion', 'Nivelación'], ['planeacion', 'Planeación'],
-  ['copias', 'Copias y Excel'], ['config', 'Año y materias'],
+  ['inicio', 'Hoy'], ['notas', 'Notas'], ['estudiantes', 'Estudiantes'], ['nivelacion', 'Nivelación'], ['planeacion', 'Planeación'],
+  ['copias', 'Respaldo'], ['config', 'Año y materias'],
 ];
 
 function pintarMenu() {
@@ -93,7 +96,7 @@ function pintarMenu() {
 }
 
 async function mostrar() {
-  pintarMenu();
+  guardarSel(); pintarMenu();
   const cont = document.getElementById('contenido');
   await intentar(async () => {
     await cargarEstado();
@@ -106,14 +109,14 @@ async function mostrar() {
         h('button', { class: 'principal', onclick: () => { vista = 'config'; mostrar(); } }, 'Ir a «Año y materias»')));
       return;
     }
-    await ({ notas: pantallaNotas, estudiantes: pantallaEstudiantes, nivelacion: pantallaNivelacion, planeacion: pantallaPlaneacion, copias: pantallaCopias, config: pantallaConfig })[vista](cont);
+    await ({ inicio: pantallaInicio, notas: pantallaNotas, estudiantes: pantallaEstudiantes, nivelacion: pantallaNivelacion, planeacion: pantallaPlaneacion, copias: pantallaCopias, config: pantallaConfig })[vista](cont);
   });
 }
 
 // --- Notas --------------------------------------------------------------------------------------
 
 async function pantallaNotas(cont) {
-  const filtros = h('section', { class: 'tarjeta' },
+  const filtros = h('section', { class: 'contexto' },
     h('h2', {}, 'Notas'),
     selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }),
     selector('Grado', opcionesGrado(), sel.grado, (v) => { sel.grado = Number(v); mostrar(); }),
@@ -124,12 +127,15 @@ async function pantallaNotas(cont) {
   const resumen = h('p', { class: 'suave' });
   const actualizarResumen = () => {
     const ap = filas.filter((f) => f.aprobado === true).length; const rep = filas.filter((f) => f.aprobado === false).length;
-    resumen.textContent = `${filas.length === 1 ? '1 estudiante' : filas.length + ' estudiantes'} · aprobados: ${ap} · no aprobados: ${rep} · sin definitiva: ${filas.length - ap - rep}`;
+    const faltan = filas.reduce((n, f) => n + [f.n1, f.n2, f.n3].filter((v) => v === null).length, 0);
+    const vals = filas.map((f) => f.definitiva.valor).filter((v) => v !== null);
+    const prom = vals.length ? fmt1(Math.round((vals.reduce((x, y) => x + y, 0) / vals.length) * 10) / 10) : '—';
+    resumen.textContent = `${filas.length === 1 ? '1 estudiante' : filas.length + ' estudiantes'} · aprueban: ${ap} · no aprueban: ${rep} · sin definitiva: ${filas.length - ap - rep} · notas por escribir: ${faltan} · promedio del grupo: ${prom}`;
   };
   for (const f of filas) cuerpo.append(filaNotas(f, actualizarResumen));
   actualizarResumen();
   const tabla = filas.length
-    ? h('table', {}, h('thead', {}, h('tr', {}, ['Estudiante', 'Nota 1', 'Nota 2', 'Nota 3', 'Definitiva del periodo', 'Estado', 'Definitiva del año'].map((t) => h('th', {}, t)))), cuerpo)
+    ? h('table', {}, h('thead', {}, h('tr', {}, ['Estudiante', 'Nota 1', 'Nota 2', 'Nota 3', 'Periodo', 'Estado', 'Año'].map((t) => h('th', {}, t)))), cuerpo)
     : h('p', { class: 'vacio' }, 'No hay estudiantes en este grado. Agréguelos en «Estudiantes».');
   const planilla = `/api/reportes/planilla?anio_id=${sel.anio}&grado=${sel.grado}&materia_id=${sel.materia}`;
   cont.replaceChildren(filtros, h('section', { class: 'tarjeta' }, tabla, resumen,
@@ -141,14 +147,15 @@ async function pantallaNotas(cont) {
 
 function filaNotas(f, alCambiarResumen) {
   const entradas = ['n1', 'n2', 'n3'].map((k) => h('input', { class: 'nota', type: 'text', inputmode: 'decimal', value: fmt2(f[k]), 'aria-label': `${k.replace('n', 'Nota ')} de ${f.nombre}` }));
-  const celdaDef = h('td'); const celdaEstado = h('td'); const celdaAnio = h('td');
+  const marcarVacias = () => entradas.forEach((e) => e.classList.toggle('vacia', e.value.trim() === ''));
+  const celdaDef = h('td'); const celdaEstado = h('td'); const celdaAnio = h('td', { class: 'sin-partir' });
   const tr = h('tr', {}, h('td', {}, f.nombre), entradas.map((e) => h('td', {}, e)), celdaDef, celdaEstado, celdaAnio);
   const pintar = () => {
     celdaDef.textContent = f.definitiva.estado === 'completa' ? fmt1(f.definitiva.valor) : 'Falta nota';
     celdaEstado.replaceChildren(f.aprobado === null ? h('span', { class: 'vacio' }, '—')
       : h('span', { class: `etiqueta ${f.aprobado ? 'bien' : 'mal'}` }, f.aprobado ? 'Aprobado' : 'No aprobado'));
     celdaAnio.textContent = f.anio.estado === 'completa' ? `${fmt1(f.anio.valor)} ${f.anio.aprobado ? '' : '(no aprobado)'}` : '—';
-    tr.className = f.aprobado === false ? 'reprobado' : '';
+    tr.className = f.aprobado === false ? 'reprobado' : ''; marcarVacias();
   };
   pintar();
   // Los guardados de una fila van en cola: así el último valor escrito es siempre el que queda en la base.
@@ -169,7 +176,14 @@ function filaNotas(f, alCambiarResumen) {
   };
   entradas.forEach((e) => {
     e.addEventListener('change', guardar);
-    e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); e.blur(); } });
+    e.addEventListener('input', marcarVacias);
+    e.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); e.blur(); return; }
+      if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+      const otra = ev.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling; // misma columna, fila vecina
+      const destino = otra?.querySelectorAll('input.nota')[entradas.indexOf(e)];
+      if (destino) { ev.preventDefault(); destino.focus(); destino.select(); }
+    });
   });
   return tr;
 }
@@ -218,13 +232,13 @@ function filaEstudiante(x) {
       tr.replaceChildren(h('td', {}, x.nombre), h('td', {}, x.documento ?? '—'),
         h('td', {}, x.activo ? h('span', { class: 'etiqueta bien' }, 'Activo') : h('span', { class: 'etiqueta' }, 'Archivado')),
         h('td', {}, h('button', { class: 'secundario', onclick: () => pintar(true) }, 'Editar'), ' ',
-          h('button', { class: 'secundario', onclick: () => intentar(async () => {
+          h('details', { class: 'menu-doc' }, h('summary', {}, 'Documentos'), h('div', { class: 'menu-lista' },
+            ...[['Boletín PDF', 'boletin', 'pdf'], ['Boletín Word', 'boletin', 'docx'], ['Certificado PDF', 'certificado', 'pdf'], ['Certificado Word', 'certificado', 'docx']].map(([t, tipo, f]) =>
+              h('button', { onclick: (ev) => { ev.target.closest('details').open = false; descargarDocumento(`/api/reportes/${tipo}?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=${f}`); } }, t)))), ' ',
+          h('button', { class: 'secundario', onclick: () => { if (x.activo && !confirm(`¿Archivar a ${x.nombre}? Sus notas se conservan y puede reactivarlo cuando quiera.`)) return; intentar(async () => {
             await json('POST', `/api/estudiantes/${x.estudiante_id}/archivar`, { archivar: !!x.activo });
             aviso(x.activo ? 'Archivado: sus notas se conservan' : 'Restaurado'); mostrar();
-          }) }, x.activo ? 'Archivar' : 'Reactivar'), ' ',
-          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/boletin?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=pdf`) }, 'Boletín PDF'), ' ',
-          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/boletin?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=docx`) }, 'Boletín Word'), ' ',
-          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/certificado?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=pdf`) }, 'Certificado')));
+          }); } }, x.activo ? 'Archivar' : 'Reactivar')));
     }
   };
   pintar(false);
@@ -303,16 +317,16 @@ async function pantallaCopias(cont) {
     });
   };
   cont.replaceChildren(
-    h('section', { class: 'tarjeta' }, h('h2', {}, 'Copias de seguridad'),
-      h('p', { class: 'suave' }, 'El programa hace una copia sola al abrirse y al cerrarse. Aquí puede hacer una copia ahora.'),
-      h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: () => intentar(async () => { await json('POST', '/api/respaldo'); aviso('Copia creada'); mostrar(); }) }, 'Crear copia ahora')),
-      copias.length ? lista : h('p', { class: 'vacio' }, 'Aún no hay copias.')),
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Excel: su seguro de vida'),
       h('p', { class: 'suave' }, 'Descargue todo en un Excel y guárdelo en una memoria USB. Si el programa se daña, con ese archivo recupera todo.'),
       h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: descargarExcel }, 'Descargar todo en Excel')),
       h('h3', {}, 'Recuperar desde un Excel'),
       h('div', { class: 'fila-acciones' }, archivo, h('button', { class: 'secundario', onclick: analizar }, 'Revisar archivo')),
-      resultado));
+      resultado),
+    h('section', { class: 'tarjeta' }, h('h2', {}, 'Copias de seguridad'),
+      h('p', { class: 'suave' }, 'El programa hace una copia sola al abrirse y al cerrarse. Aquí puede hacer una copia ahora.'),
+      h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: () => intentar(async () => { await json('POST', '/api/respaldo'); aviso('Copia creada'); mostrar(); }) }, 'Crear copia ahora')),
+      copias.length ? lista : h('p', { class: 'vacio' }, 'Aún no hay copias.')));
 }
 
 function etiquetaCopia(c) {
@@ -359,7 +373,7 @@ async function pantallaConfig(cont) {
         h('label', {}, 'Año', anio), h('button', { class: 'principal', type: 'submit' }, 'Crear año')),
       h('ul', { class: 'sin-vinetas' }, estado.anios.map((a) => h('li', {}, h('span', {}, `${a.anio}${a.cerrado ? ' — cerrado (solo consulta)' : ''}`),
         a.cerrado ? null : h('button', { class: 'peligro', onclick: () => {
-          if (confirm(`¿Cerrar el año ${a.anio}? Después solo se podrá consultar.`)) intentar(async () => { await json('POST', `/api/anios/${a.id}/cerrar`); mostrar(); });
+          if (confirm(`¿Cerrar el año ${a.anio}?\n\nDespués no podrá escribir ni cambiar notas, temas, clases ni planes de ese año: solo consultarlos. Descargue antes su Excel de respaldo.`)) intentar(async () => { await json('POST', `/api/anios/${a.id}/cerrar`); mostrar(); });
         } }, 'Cerrar año'))))),
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Materias'),
       h('form', { onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('POST', '/api/materias', { nombre: mat.value }); aviso('Materia creada'); mostrar(); }); } },
@@ -393,12 +407,12 @@ let seccionPlan = 'temas';
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
 async function pantallaPlaneacion(cont) {
-  const barra = h('section', { class: 'tarjeta' }, h('h2', {}, 'Planeación'),
+  const barra = h('section', { class: 'contexto' }, h('h2', {}, 'Planeación'),
     h('div', { class: 'fila' },
       selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }),
       selector('Grado', opcionesGrado(), sel.grado, (v) => { sel.grado = Number(v); mostrar(); }),
       selector('Materia', opcionesMateria(), sel.materia, (v) => { sel.materia = Number(v); mostrar(); })),
-    h('div', { class: 'fila' }, SECCIONES_PLAN.map(([id, t]) => h('button', { 'aria-current': id === seccionPlan ? 'true' : false, onclick: () => { seccionPlan = id; mostrar(); } }, t))));
+    h('div', { class: 'pestanas' }, SECCIONES_PLAN.map(([id, t]) => h('button', { 'aria-current': id === seccionPlan ? 'true' : false, onclick: () => { seccionPlan = id; mostrar(); } }, t))));
   const filtro = `anio_id=${sel.anio}&materia_id=${sel.materia}&grado=${sel.grado}`;
   const cuerpo = await ({ temas: seccionTemas, clases: seccionClases, planes: seccionPlanes, guias: seccionGuias })[seccionPlan](filtro);
   cont.replaceChildren(barra, cuerpo);
@@ -448,35 +462,89 @@ async function seccionClases(filtro) {
       : h('p', { class: 'vacio' }, 'No hay clases planeadas.'));
 }
 
+let edicionPlan = null; let edicionGuia = null; // elemento que se está editando, o null si se crea uno nuevo
+
 async function seccionPlanes(filtro) {
   const planes = await json('GET', `/api/planes?${filtro}`);
-  const tipo = h('select', {}, h('option', { value: 'area' }, 'Plan de área'), h('option', { value: 'aula' }, 'Plan de aula'));
+  const e = edicionPlan && planes.find((p) => p.id === edicionPlan);
+  const tipo = h('select', {}, h('option', { value: 'area', selected: e?.tipo === 'area' }, 'Plan de área'), h('option', { value: 'aula', selected: e?.tipo === 'aula' }, 'Plan de aula'));
   const [lTit, tit] = campoTexto('Título'); const [lCon, con] = campoLargo('Contenido');
-  return h('section', { class: 'tarjeta' }, h('h3', {}, 'Nuevo plan'),
+  if (e) { tit.value = e.titulo; con.value = e.contenido; }
+  return h('section', { class: 'tarjeta' }, h('h3', {}, e ? 'Editar plan' : 'Nuevo plan'),
     h('div', { class: 'fila' }, h('label', {}, 'Tipo', tipo), lTit), lCon,
-    h('button', { class: 'principal', onclick: () => intentar(async () => {
-      await json('PUT', '/api/planes', { ...baseCuerpo(), tipo: tipo.value, titulo: tit.value, contenido: con.value }); aviso('Plan guardado'); mostrar();
-    }) }, 'Guardar plan'),
+    h('div', { class: 'fila-acciones' },
+      h('button', { class: 'principal', onclick: () => intentar(async () => {
+        await json('PUT', '/api/planes', { ...(e ? { id: e.id } : {}), ...baseCuerpo(), tipo: tipo.value, titulo: tit.value, contenido: con.value });
+        edicionPlan = null; aviso('Plan guardado'); mostrar();
+      }) }, e ? 'Guardar cambios' : 'Guardar plan'),
+      e ? h('button', { class: 'secundario', onclick: () => { edicionPlan = null; mostrar(); } }, 'Cancelar') : null),
     ...planes.map((p) => h('details', {}, h('summary', {}, `${p.tipo === 'area' ? 'Área' : 'Aula'} — ${p.titulo}`),
       h('pre', { class: 'texto' }, p.contenido),
-      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=docx`) }, 'Word'), ' ',
-      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=pdf`) }, 'PDF'), ' ',
-      h('button', { onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar'))));
+      h('div', { class: 'fila-acciones' },
+        h('button', { class: 'secundario', onclick: () => { edicionPlan = p.id; mostrar(); } }, 'Editar'),
+        h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=docx`) }, 'Word'),
+        h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=pdf`) }, 'PDF'),
+        h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar')))));
 }
 
 async function seccionGuias() {
   const guias = await json('GET', `/api/guias?materia_id=${sel.materia}&grado=${sel.grado}`);
+  const e = edicionGuia && guias.find((g) => g.id === edicionGuia);
   const [lTema, tema] = campoTexto('Tema'); const [lTit, tit] = campoTexto('Título'); const [lCon, con] = campoLargo('Contenido de la guía');
-  return h('section', { class: 'tarjeta' }, h('h3', {}, 'Nueva guía (sirve para todos los años)'),
+  if (e) { tema.value = e.tema; tit.value = e.titulo; con.value = e.contenido; }
+  return h('section', { class: 'tarjeta' }, h('h3', {}, e ? 'Editar guía' : 'Nueva guía (sirve para todos los años)'),
     h('div', { class: 'fila' }, lTema, lTit), lCon,
-    h('button', { class: 'principal', onclick: () => intentar(async () => {
-      await json('PUT', '/api/guias', { materia_id: sel.materia, grado: sel.grado, tema: tema.value, titulo: tit.value, contenido: con.value }); aviso('Guía guardada'); mostrar();
-    }) }, 'Guardar guía'),
+    h('div', { class: 'fila-acciones' },
+      h('button', { class: 'principal', onclick: () => intentar(async () => {
+        await json('PUT', '/api/guias', { ...(e ? { id: e.id } : {}), materia_id: sel.materia, grado: sel.grado, tema: tema.value, titulo: tit.value, contenido: con.value });
+        edicionGuia = null; aviso('Guía guardada'); mostrar();
+      }) }, e ? 'Guardar cambios' : 'Guardar guía'),
+      e ? h('button', { class: 'secundario', onclick: () => { edicionGuia = null; mostrar(); } }, 'Cancelar') : null),
     ...guias.map((g) => h('details', {}, h('summary', {}, `${g.tema ? g.tema + ' — ' : ''}${g.titulo}`),
       h('pre', { class: 'texto' }, g.contenido),
-      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=docx`) }, 'Word'), ' ',
-      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=pdf`) }, 'PDF'), ' ',
-      h('button', { onclick: () => { if (confirm(`¿Quitar la guía «${g.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/guias/${g.id}`); mostrar(); }); } }, 'Quitar'))));
+      h('div', { class: 'fila-acciones' },
+        h('button', { class: 'secundario', onclick: () => { edicionGuia = g.id; mostrar(); } }, 'Editar'),
+        h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=docx`) }, 'Word'),
+        h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=pdf`) }, 'PDF'),
+        h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar la guía «${g.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/guias/${g.id}`); mostrar(); }); } }, 'Quitar')))));
+}
+
+// --- Inicio -------------------------------------------------------------------------------------
+
+const fechaCorta = (iso) => new Date(iso).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const hace = (iso) => {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (min < 1) return 'hace un momento'; if (min < 60) return `hace ${min} min`;
+  if (min < 1440) return `hace ${Math.round(min / 60)} h`; return `hace ${Math.round(min / 1440)} días`;
+};
+function dato(clase, cifra, nombre, ...extra) {
+  return h('div', { class: `dato ${clase}` }, h('span', { class: 'cifra' }, String(cifra)), h('span', { class: 'nombre' }, nombre), ...extra);
+}
+
+async function pantallaInicio(cont) {
+  const r = await json('GET', `/api/resumen?anio_id=${sel.anio}`);
+  const rp = r.respaldo;
+  const botonExcel = h('button', { class: rp.avisarExcel ? 'principal' : 'secundario', onclick: async () => { await descargarExcel(); mostrar(); } }, 'Descargar Excel ahora');
+  const excel = dato('bien', hace(rp.ultimoExcel ?? new Date().toISOString()), 'Último Excel de respaldo', botonExcel); // solo se muestra cuando está al día
+  cont.replaceChildren(
+    h('section', { class: 'contexto' }, h('h2', {}, 'Hoy'),
+      h('div', { class: 'fila' }, selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }))),
+    rp.avisarExcel ? h('section', { class: 'tarjeta recuperacion' }, h('h2', {}, 'Haga hoy su copia en Excel'),
+      h('p', {}, rp.ultimoExcel ? 'Hace más de dos semanas que no descarga el Excel de respaldo.' : 'Todavía no ha descargado el Excel de respaldo.'),
+      h('p', { class: 'suave' }, 'Es su seguro de vida: guárdelo también en una memoria USB. Si el computador se daña, con ese archivo recupera todo.'),
+      botonExcel) : null,
+    h('div', { class: 'rejilla' },
+      dato('', r.estudiantes, r.estudiantes === 1 ? 'estudiante' : 'estudiantes', h('span', { class: 'suave' }, r.porGrado.map((g) => `${NOMBRE_GRADO[g.grado]}: ${g.n}`).join(' · ') || 'Aún no hay estudiantes')),
+      dato(r.noAprobados ? 'mal' : 'bien', r.noAprobados, r.noAprobados === 1 ? 'estudiante no aprueba' : 'estudiantes no aprueban', h('span', { class: 'suave' }, `${r.materiasReprobadas} materias con definitiva menor de 3,0`)),
+      dato(r.nivelacionesPendientes ? 'alerta' : 'bien', r.nivelacionesPendientes, 'nivelaciones pendientes', r.nivelacionesPendientes ? h('button', { class: 'secundario', onclick: () => { vista = 'nivelacion'; mostrar(); } }, 'Ver nivelaciones') : null),
+      dato('', `${r.temas.porcentaje} %`, 'de los temas vistos', h('progress', { max: 100, value: r.temas.porcentaje, 'aria-label': 'Avance de temas' }), h('span', { class: 'suave' }, `${r.temas.vistos} de ${r.temas.total} temas`)),
+      dato(rp.ultimaCopia ? 'bien' : 'alerta', rp.ultimaCopia ? hace(rp.ultimaCopia) : 'Ninguna', 'Última copia automática', h('span', { class: 'suave' }, `${rp.copias} copias guardadas`)),
+      ...(rp.avisarExcel ? [] : [excel])),
+    h('section', { class: 'tarjeta' }, h('h2', {}, 'Qué quiere hacer'),
+      h('div', { class: 'accesos' },
+        h('button', { class: 'principal', onclick: () => { vista = 'notas'; mostrar(); } }, 'Poner notas'),
+        h('button', { class: 'secundario', onclick: () => { vista = 'estudiantes'; mostrar(); } }, 'Agregar un estudiante'),
+        h('button', { class: 'secundario', onclick: () => { vista = 'planeacion'; mostrar(); } }, 'Planear una clase'))));
 }
 
 // --- Arranque -----------------------------------------------------------------------------------
