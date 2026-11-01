@@ -1,11 +1,11 @@
 # Trazabilidad: criterios de la spec contra lo construido (2026-10-31)
 
-Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado a la versión `v0.1.4`.
+Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado a la versión `v0.1.5` (corregido tras la auditoría final independiente: el «33 de 33» anterior estaba sobrestimado).
 **Cumplido** = implementado y probado. **Con desviación** = se hace, pero distinto a como lo dice la spec (se explica). **Pendiente** = no hecho.
 
 | Criterio | Estado | Evidencia / nota |
 |---|---|---|
-| CA-001-01 grados 0–5; materias por grado | Cumplido (cerrado en v0.1.4) | Cada materia se marca con los grados donde se dicta (ninguno marcado = todos). Las pantallas de Notas y Planeación ofrecen solo las materias del grado, y el servidor rechaza notas, planes, guías, temas y clases de una materia fuera de sus grados. Lo ya escrito no se borra. `spec-cruce2.test.js`, Edge |
+| CA-001-01 grados 0–5; materias por grado | Cumplido, con salvedad | Cada materia se marca con los grados donde se dicta; Notas y Planeación ofrecen solo las del grado y el servidor rechaza escrituras fuera de ellos. Salvedad: si luego se quita un grado a una materia que ya tiene notas, esas notas siguen contando en «No aprueban» y boletines pero ya no se ven en «Notas»; el programa avisa cuántos estudiantes quedan así. `spec-cruce2.test.js`, `auditoria-final.test.js` |
 | CA-001-02 estudiantes: crear, editar, archivar | Cumplido | `academico.test.js`, Edge |
 | CA-001-03 varios años; cerrado = solo lectura | Cumplido | Incluye reabrir año |
 | CA-001-04 multigrado | Cumplido | Todas las vistas filtran por grado |
@@ -29,19 +29,19 @@ Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado
 | CA-006-02 porcentaje de avance por grado, materia y periodo | Cumplido (nuevo) | Avance total y por cada periodo |
 | CA-006-03 clase vinculada a tema y a guía | Cumplido (nuevo) | |
 | CA-006-04 asistencia por fecha y grado | Cumplido (nuevo) | Pestaña «Asistencia»; presente, ausente o excusa; cuenta ausencias |
-| CA-007-01 copia al abrir y cerrar; últimas N configurables | Cumplido (nuevo: N configurable) | «Respaldo → Cuántas copias automáticas guardar» (5 a 200, por defecto 30) |
+| CA-007-01 copia al abrir y cerrar; últimas N configurables | Cumplido, con salvedad | N se configura (5 a 200, por defecto 30) y aplica a las copias automáticas «abrir» y «cerrar»; las copias «antes de restaurar/importar» tienen un tope fijo de 5 por motivo. |
 | CA-007-02 integridad antes de restaurar | Cumplido | `respaldo.test.js` |
 | CA-007-03 base dañada: ofrece la última sana | Cumplido | `arranque.test.js` |
 | CA-007-04 restaurar conserva la base actual | Cumplido | |
 | CA-007-05 carpeta adicional (USB) | Cumplido | Revisión independiente |
-| CA-008-01 exportar todo a `.xlsx` | Cumplido | Excluye los archivos adjuntos de las guías |
+| CA-008-01 exportar todos los datos a `.xlsx` | **Con desviación** | El Excel NO incluye los archivos adjuntos de las guías (una celda de Excel no puede guardar archivos). Se compensa con «Descargar copia completa» (archivo .db con todo, adjuntos incluidos) y se avisa en las pantallas y en el LEEME. Tampoco lleva la carpeta de la memoria USB (es de cada equipo). |
 | CA-008-02 ida y vuelta idéntica | Cumplido | Incluye las tablas nuevas |
-| CA-008-03 importar sobre datos pide confirmación con resumen | Cumplido | Y rechaza un Excel de otra base |
+| CA-008-03 importar sobre datos pide confirmación con resumen | Cumplido, con salvedad | Pide confirmación con resumen y hace copia antes; rechaza un Excel de otra base o sin identidad. Salvedad: al ser una restauración, la importación también escribe en años cerrados. |
 | CA-008-04 Excel inválido o de otra versión se rechaza con detalle | Cumplido | |
 | CA-009-01 planilla xlsx y pdf | Cumplido | |
 | CA-009-02 boletín con notas, definitiva, nivelación y observaciones | Cumplido (nuevo: observaciones) | Botón «Observaciones» por estudiante |
 | CA-009-03 certificado con encabezado configurable | Cumplido | Formato provisional |
 | CA-009-04 tildes y eñes | Cumplido | PDF revisado a ojo; Word sin revisión visual |
 
-**Resumen:** 33 criterios; 33 cumplidos, 0 con desviación, 0 pendientes. 148 pruebas.
+**Resumen:** 33 criterios; 29 cumplidos sin reservas, 3 cumplidos con salvedad (CA-001-01, CA-007-01, CA-008-03), 1 con desviación (CA-008-01), 0 pendientes. 159 pruebas.
 **Lo que ningún criterio cubre pero sigue sin verificar:** ejecución en el ASUS con Windows 10, los Word y el certificado a la vista, tres hallazgos bajos de la revisión independiente.

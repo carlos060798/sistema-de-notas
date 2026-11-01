@@ -10,13 +10,13 @@ import { fileURLToPath } from 'node:url';
 import { abrirBase, VERSION_ESQUEMA } from '../datos/base.js';
 import {
   ErrorValidacion, crearAnio, cerrarAnio, reabrirAnio, listarAnios, crearMateria, listarMaterias,
-  crearEstudiante, editarEstudiante, renombrarMateria, guardarGradosMateria, leerUmbral, guardarUmbral, archivarEstudiante, listarEstudiantes,
+  crearEstudiante, editarEstudiante, renombrarMateria, guardarGradosMateria, estudiantesConNotasFueraDeGrado, leerUmbral, guardarUmbral, archivarEstudiante, listarEstudiantes,
   guardarNotas, listarNotas, desaprobadas, guardarNivelacion, pendientesNivelacion,
 } from '../servicios/academico.js';
 import { resumen, registrarExcelDescargado } from '../servicios/resumen.js';
 import * as PL from '../servicios/planeacion.js';
 import { leerCarpetaExtra, guardarCarpetaExtra, copiarAExtra, leerRetencion, guardarRetencion } from '../respaldo/extra.js';
-import { crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
+import { adoptarCopia, crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
 import { datosPlanilla, datosBoletin, datosTexto, guardarInstitucion, encabezado } from '../reportes/datos.js';
 import * as FM from '../reportes/formatos.js';
 import { exportarExcel, analizarExcel, importarExcel, ErrorImportacion } from '../excel/excel.js';
@@ -135,7 +135,7 @@ export function crearServidor(opciones) {
     { metodo: 'PUT', patron: /^\/api\/observaciones$/, cuerpo: 'json', h: ({ b }) => { PL.guardarObservacion(bd(), b ?? {}); return { json: { ok: true } }; } },
     { metodo: 'GET', patron: /^\/api\/institucion$/, cuerpo: null, h: () => ({ json: encabezado(bd()) }) },
     { metodo: 'PUT', patron: /^\/api\/institucion$/, cuerpo: 'json', h: ({ b }) => { guardarInstitucion(bd(), b ?? {}); return { json: encabezado(bd()) }; } },
-    { metodo: 'PUT', patron: /^\/api\/materias\/(\d+)\/grados$/, cuerpo: 'json', h: ({ p, b }) => ({ json: { grados: guardarGradosMateria(bd(), Number(p[0]), b?.grados) } }) },
+    { metodo: 'PUT', patron: /^\/api\/materias\/(\d+)\/grados$/, cuerpo: 'json', h: ({ p, b }) => { const grados = guardarGradosMateria(bd(), Number(p[0]), b?.grados); return { json: { grados, conNotasFueraDeGrado: estudiantesConNotasFueraDeGrado(bd(), Number(p[0])) } }; } },
     { metodo: 'PUT', patron: /^\/api\/materias\/(\d+)$/, cuerpo: 'json', h: ({ p, b }) => ({ json: renombrarMateria(bd(), Number(p[0]), b?.nombre) }) },
     { metodo: 'POST', patron: /^\/api\/materias$/, cuerpo: 'json', h: ({ b }) => ({ json: crearMateria(bd(), b?.nombre) }) },
 
@@ -182,7 +182,18 @@ export function crearServidor(opciones) {
 
     { metodo: 'GET', patron: /^\/api\/respaldo$/, cuerpo: null, libre: true, h: () => ({
       json: ctx.carpetaCopias ? listarCopias(ctx.carpetaCopias).map((c) => ({ nombre: c.nombre, motivo: c.motivo })) : [] }) },
-    { metodo: 'POST', patron: /^\/api\/respaldo$/, cuerpo: null, h: () => ({ json: { nombre: path.basename(crearCopia(bd(), carpeta(), 'manual')), extra: copiarAExtra(bd(), 'manual', 30) } }) },
+    { metodo: 'POST', patron: /^\/api\/respaldo$/, cuerpo: null, h: () => ({ json: { nombre: path.basename(crearCopia(bd(), carpeta(), 'manual')), extra: copiarAExtra(bd(), 'manual', leerRetencion(bd())) } }) },
+    { metodo: 'GET', patron: /^\/api\/respaldo\/completa$/, cuerpo: null, h: () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'notas-completa-'));
+      try {
+        const ruta = crearCopia(bd(), dir, 'manual');
+        return { raw: fs.readFileSync(ruta), headers: { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent('copia-completa-notas-' + hoy() + '.db')}` } };
+      } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    } },
+    { metodo: 'POST', patron: /^\/api\/respaldo\/agregar$/, cuerpo: 'raw', h: ({ b }) => conArchivo(b, async (f) => {
+      try { return { json: { nombre: path.basename(adoptarCopia(f, carpeta())) } }; }
+      catch (e) { throw new ErrorValidacion('Ese archivo no sirve como copia: ' + /** @type {Error} */ (e).message); }
+    }) },
     { metodo: 'GET', patron: /^\/api\/respaldo\/extra$/, cuerpo: null, h: () => ({ json: { carpeta: leerCarpetaExtra(bd()) } }) },
     { metodo: 'PUT', patron: /^\/api\/respaldo\/extra$/, cuerpo: 'json', h: ({ b }) => ({ json: { carpeta: guardarCarpetaExtra(bd(), b?.carpeta) } }) },
     { metodo: 'POST', patron: /^\/api\/respaldo\/restaurar$/, cuerpo: 'json', h: ({ b }) => { restaurarCopia(copiaPorNombre(b?.nombre).ruta); return { json: { ok: true } }; } },

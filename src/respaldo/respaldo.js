@@ -36,6 +36,20 @@ export function crearCopia(db, carpeta, motivo) {
 }
 
 /**
+ * Agrega a la carpeta de copias un archivo de base completo (por ejemplo, una copia guardada en una memoria USB),
+ * si es íntegro y de una versión que este programa entiende. Después se puede restaurar desde la lista.
+ * @param {string} archivo @param {string} carpeta @returns {string} ruta de la copia agregada
+ */
+export function adoptarCopia(archivo, carpeta) {
+  const v = verificarCopia(archivo);
+  if (!v.ok) throw new Error(v.motivo ?? 'El archivo no es una copia válida');
+  fs.mkdirSync(carpeta, { recursive: true });
+  const destino = path.join(carpeta, `notas-${marca()}-manual.db`);
+  fs.copyFileSync(archivo, destino);
+  return destino;
+}
+
+/**
  * Copias de una carpeta, de la más nueva a la más vieja. Ignora archivos ajenos.
  * @param {string} carpeta @returns {{ ruta: string, nombre: string, motivo: string }[]}
  */

@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { iniciar } from '../src/arranque.js';
 import { abrirBase } from '../src/datos/base.js';
-import { guardarCarpetaExtra } from '../src/respaldo/extra.js';
+import { guardarCarpetaExtra, subcarpetaExtra } from '../src/respaldo/extra.js';
 import { listarCopias } from '../src/respaldo/respaldo.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'arr-'));
@@ -82,22 +82,24 @@ describe('arranque', () => {
     await app.cerrar();
   });
   test('copia a una carpeta extra (USB) al cerrar; si no está disponible, el programa cierra igual', async () => {
-    const dir = tmp(); const usb = path.join(tmp(), 'USB', 'Respaldos');
+    const dir = tmp(); const usb = path.join(tmp(), 'USB'); fs.mkdirSync(usb); // la memoria existe; la carpeta se crea dentro
     const a = await iniciar(opciones(dir));
     const H = { 'x-token': a.token, 'content-type': 'application/json' };
     const g = await fetch(a.url + '/api/respaldo/extra', { method: 'PUT', headers: H, body: JSON.stringify({ carpeta: usb }) });
     assert.equal(g.status, 200);
     await a.cerrar();
-    assert.ok(listarCopias(usb).some((c) => c.motivo === 'cerrar'), 'no hay copia en la carpeta extra');
+    const b0 = abrirBase(path.join(dir, 'notas.db')); const sub = path.join(usb, subcarpetaExtra(b0)); b0.close();
+    assert.ok(listarCopias(sub).some((c) => c.motivo === 'cerrar'), 'no hay copia en la carpeta extra (subcarpeta de esta base)');
     // ahora la «memoria» desaparece: cerrar no debe fallar
     const b = await iniciar(opciones(dir));
-    fs.rmSync(path.dirname(usb), { recursive: true, force: true }); fs.writeFileSync(path.dirname(usb), 'archivo en lugar de carpeta');
+    fs.rmSync(usb, { recursive: true, force: true }); fs.writeFileSync(usb, 'archivo en lugar de carpeta');
     await b.cerrar();
     assert.equal(fs.existsSync(path.join(dir, 'notas.lock')), false);
   });
   test('carpeta extra: valida la ruta y permite quitarla', () => {
     const db = abrirBase(':memory:');
     assert.throws(() => guardarCarpetaExtra(db, 'Respaldos'), /ruta completa/);
+    assert.throws(() => guardarCarpetaExtra(db, path.join(tmp(), 'no-existe', 'usb')), /carpeta superior/); // no se inventan rutas
     const ok = path.join(tmp(), 'usb'); assert.equal(guardarCarpetaExtra(db, ok), ok);
     assert.equal(guardarCarpetaExtra(db, ''), '');
   });

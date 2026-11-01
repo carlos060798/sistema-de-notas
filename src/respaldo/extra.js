@@ -5,6 +5,12 @@ import path from 'node:path';
 import { crearCopia, aplicarRetencion } from './respaldo.js';
 import { ErrorValidacion } from '../servicios/academico.js';
 
+/** Carpeta de esta base dentro de la carpeta extra: así dos bases en la misma USB no se borran copias entre sí. @param {Db} db */
+export function subcarpetaExtra(db) {
+  const id = /** @type {{ valor: string } | undefined} */ (db.prepare("select valor from config where clave = 'base.id'").get())?.valor ?? 'base';
+  return 'copias-' + id.slice(0, 8);
+}
+
 /** @typedef {import('node:sqlite').DatabaseSync} Db */
 const CLAVE = 'respaldo.carpeta_extra';
 
@@ -22,6 +28,8 @@ export function guardarCarpetaExtra(db, carpeta) {
   const c = String(carpeta ?? '').trim();
   if (!c) { db.prepare('delete from config where clave = ?').run(CLAVE); return ''; }
   if (!path.isAbsolute(c)) throw new ErrorValidacion('Escriba la ruta completa de la carpeta, por ejemplo E:\\Respaldos (la letra de su memoria USB)');
+  // Se crea solo la última carpeta: si la de arriba no existe (por ejemplo, una letra de USB mal escrita), es un error y no se inventa la ruta.
+  if (!fs.existsSync(path.dirname(c))) throw new ErrorValidacion('La carpeta superior de esa ruta no existe. Revise que la memoria USB esté conectada y que la ruta esté bien escrita');
   try { fs.mkdirSync(c, { recursive: true }); fs.accessSync(c, fs.constants.W_OK); }
   catch { throw new ErrorValidacion('No se puede escribir en esa carpeta. Revise que la memoria USB esté conectada y que la ruta esté bien escrita'); }
   db.prepare('insert into config(clave, valor) values (?, ?) on conflict(clave) do update set valor = excluded.valor').run(CLAVE, c);
@@ -37,7 +45,8 @@ export function copiarAExtra(db, motivo, retencion) {
   const carpeta = leerCarpetaExtra(db);
   if (!carpeta) return { estado: 'sin-configurar', carpeta: '', mensaje: '' };
   try {
-    crearCopia(db, carpeta, motivo); aplicarRetencion(carpeta, retencion);
+    const destino = path.join(carpeta, subcarpetaExtra(db));
+    crearCopia(db, destino, motivo); aplicarRetencion(destino, retencion);
     return { estado: 'ok', carpeta, mensaje: `Copia guardada también en ${carpeta}` };
   } catch (e) {
     return { estado: 'fallo', carpeta, mensaje: `No se pudo copiar a ${carpeta}: ${/** @type {Error} */ (e).message}. ¿Está conectada la memoria USB?` };

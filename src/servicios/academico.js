@@ -97,6 +97,16 @@ export const listarMaterias = (db) => {
 };
 
 /**
+ * Cuántos estudiantes tienen notas de esta materia en grados donde ya no se dicta. Esas notas siguen contando
+ * en las listas y boletines, pero ya no se ven en la pantalla de Notas: conviene avisar al docente.
+ * @param {Db} db @param {number} materiaId
+ */
+export function estudiantesConNotasFueraDeGrado(db, materiaId) {
+  if (!uno(db, 'select 1 x from materia_grado where materia_id = ?', materiaId)) return 0;
+  return Number(uno(db, `select count(distinct n.matricula_id) n from nota n join matricula m on m.id = n.matricula_id
+    where n.materia_id = ? and m.grado_id not in (select grado_id from materia_grado where materia_id = ?)`, materiaId, materiaId).n);
+}
+/**
  * ¿Se ofrece esta materia en este grado? Una materia sin grados marcados se ofrece en todos.
  * @param {Db} db @param {number} materiaId @param {number} grado
  */
@@ -281,8 +291,10 @@ export function guardarNivelacion(db, d) {
     fecha = d.fecha;
   }
   const c = calcular(todos(db, 'select periodo, n1, n2, n3 from nota where matricula_id = ? and materia_id = ?', d.matricula_id, d.materia_id), leerUmbral(db));
-  if (c.anio.estado !== 'completa' || c.anio.aprobado !== false) {
-    throw new ErrorValidacion('La nivelación solo se abre cuando la definitiva del año de la materia es menor de 3,0');
+  // Si el docente cambió la nota mínima después de abrir una nivelación, esa nivelación sigue siendo editable.
+  const yaAbierta = !!uno(db, 'select 1 x from nivelacion where matricula_id = ? and materia_id = ?', d.matricula_id, d.materia_id);
+  if (!yaAbierta && (c.anio.estado !== 'completa' || c.anio.aprobado !== false)) {
+    throw new ErrorValidacion(`La nivelación solo se abre cuando la definitiva del año de la materia es menor de ${leerUmbral(db).toFixed(1).replace('.', ',')}`);
   }
   db.prepare(
     `insert into nivelacion(matricula_id, materia_id, actividades, fecha, nota) values (?, ?, ?, ?, ?)

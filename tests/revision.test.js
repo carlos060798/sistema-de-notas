@@ -8,6 +8,7 @@ import path from 'node:path';
 import { abrirBase } from '../src/datos/base.js';
 import { crearServidor } from '../src/servidor/servidor.js';
 import { listarCopias } from '../src/respaldo/respaldo.js';
+import { subcarpetaExtra } from '../src/respaldo/extra.js';
 
 /** @type {Array<() => Promise<void>>} */ const aCerrar = [];
 after(async () => { for (const c of aCerrar) await c(); });
@@ -32,7 +33,7 @@ test('un año cerrado se puede reabrir y entonces vuelve a admitir cambios', asy
   const usb = path.join(dir, 'usb');
   assert.equal((await llamar('PUT', '/api/respaldo/extra', { carpeta: usb })).status, 200);
   assert.equal((await j('POST', '/api/respaldo')).extra.estado, 'ok');
-  assert.ok(listarCopias(usb).some((c) => c.motivo === 'manual'));
+  assert.ok(listarCopias(path.join(usb, subcarpetaExtra(/** @type {any} */ (s.ctx.db)))).some((c) => c.motivo === 'manual'));
   assert.equal((await llamar('PUT', '/api/respaldo/extra', { carpeta: 'relativa' })).status, 400);
 });
 

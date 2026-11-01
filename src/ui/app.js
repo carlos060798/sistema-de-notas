@@ -280,8 +280,9 @@ function filaEstudiante(x) {
 // --- Nivelación ---------------------------------------------------------------------------------
 
 async function pantallaNivelacion(cont) {
+  const { umbral } = await json('GET', '/api/umbral');
   const cab = h('section', { class: 'tarjeta' }, h('h2', {}, 'Plan de nivelación'),
-    h('p', { class: 'suave' }, 'Aquí aparecen los estudiantes cuya definitiva del año, en una materia, es menor de 3,0. La nota de nivelación se guarda aparte: no reemplaza la original.'),
+    h('p', { class: 'suave' }, 'Aquí aparecen los estudiantes cuya definitiva del año, en una materia, es menor de ' + fmt1(umbral) + '. La nota de nivelación se guarda aparte: no reemplaza la original.'),
     selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }));
   const pend = await json('GET', `/api/nivelaciones/pendientes?anio_id=${sel.anio}`);
   const tarjetas = pend.map((p) => {
@@ -353,6 +354,7 @@ async function pantallaCopias(cont) {
     } }, 'Restaurar')))
   );
   const resultado = h('div');
+  const archivoDb = h('input', { type: 'file', accept: '.db', 'aria-label': 'Archivo de copia completa (.db)' });
   const archivo = h('input', { type: 'file', accept: '.xlsx', 'aria-label': 'Archivo de Excel a importar' });
   const analizar = async () => {
     const f = archivo.files[0]; if (!f) return aviso('Elija primero un archivo de Excel (.xlsx)', true);
@@ -365,10 +367,19 @@ async function pantallaCopias(cont) {
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Excel: su seguro de vida'),
       h('p', { class: 'suave' }, 'Descargue todo en un Excel y guárdelo en una memoria USB. Si el programa se daña, con ese archivo recupera sus datos. Los archivos adjuntos de las guías no van en el Excel: esos quedan en las copias de seguridad.'),
       h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: descargarExcel }, 'Descargar todo en Excel')),
+      h('h3', {}, 'Copia completa (con archivos adjuntos)'),
+      h('p', { class: 'suave' }, 'El Excel no guarda los archivos adjuntos de las guías (PDF, imágenes, etc.). Esta copia sí los incluye: descárguela y guárdela en la memoria USB junto con el Excel.'),
+      h('div', { class: 'fila-acciones' }, h('button', { class: 'secundario', onclick: () => descargarDocumento('/api/respaldo/completa') }, 'Descargar copia completa')),
       h('h3', {}, 'Recuperar desde un Excel'),
       h('div', { class: 'fila-acciones' }, archivo, h('button', { class: 'secundario', onclick: analizar }, 'Revisar archivo')),
       resultado),
     tarjetaExtra, tarjetaRet,
+    h('section', { class: 'tarjeta' }, h('h2', {}, 'Traer una copia completa guardada'),
+      h('p', { class: 'suave' }, 'Si guardó una copia completa (archivo .db) en una memoria USB, elíjala aquí. Se agrega a la lista de copias; después puede restaurarla desde la lista.'),
+      h('div', { class: 'fila-acciones' }, archivoDb, h('button', { class: 'secundario', onclick: () => {
+        const f = archivoDb.files[0]; if (!f) return aviso('Elija primero un archivo .db', true);
+        intentar(async () => { await api('POST', '/api/respaldo/agregar', undefined, await f.arrayBuffer()); aviso('Copia agregada a la lista'); mostrar(); });
+      } }, 'Agregar a mis copias'))),
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Copias de seguridad'),
       h('p', { class: 'suave' }, 'El programa hace una copia sola al abrirse y al cerrarse. Aquí puede hacer una copia ahora.'),
       h('div', { class: 'fila-acciones' }, h('button', { class: 'principal', onclick: () => intentar(async () => { const c = await json('POST', '/api/respaldo'); if (c.extra.estado === 'fallo') aviso('Copia creada, pero ' + c.extra.mensaje, true); else aviso(c.extra.estado === 'ok' ? 'Copia creada. ' + c.extra.mensaje : 'Copia creada'); mostrar(); }) }, 'Crear copia ahora')),
@@ -410,8 +421,10 @@ function filaGradosMateria(m) {
     h('p', { class: 'suave' }, 'Marque los grados donde se dicta. Si no marca ninguno, se dicta en todos.'),
     ...estado.grados.map((g, i) => h('label', { class: 'casilla' }, marcas[i], NOMBRE_GRADO[g])),
     h('button', { class: 'principal', onclick: () => intentar(async () => {
-      await json('PUT', `/api/materias/${m.id}/grados`, { grados: estado.grados.filter((g, i) => marcas[i].checked) });
-      aviso('Grados guardados'); mostrar();
+      const g = await json('PUT', `/api/materias/${m.id}/grados`, { grados: estado.grados.filter((x, i) => marcas[i].checked) });
+      if (g.conNotasFueraDeGrado) aviso(`Guardado. Atención: ${g.conNotasFueraDeGrado} estudiante(s) tienen notas de ${m.nombre} en grados donde ya no se dicta. Esas notas siguen contando en «No aprueban» y en los boletines, pero ya no se ven en «Notas».`, true);
+      else aviso('Grados guardados');
+      mostrar();
     }) }, 'Guardar grados')));
 }
 

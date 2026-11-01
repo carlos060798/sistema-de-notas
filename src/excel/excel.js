@@ -50,7 +50,10 @@ export async function exportarExcel(db, ruta) {
     const ws = wb.addWorksheet(t);
     const cols = columnasDe(db, t).map((c) => c.name);
     ws.addRow(cols).font = { bold: true };
-    for (const fila of db.prepare(`select * from ${t} order by 1`).all()) ws.addRow(cols.map((c) => /** @type {any} */ (fila)[c]));
+    for (const fila of db.prepare(`select * from ${t} order by 1`).all()) {
+      if (t === 'config' && /** @type {any} */ (fila).clave === 'respaldo.carpeta_extra') continue; // la carpeta de la memoria USB es de este equipo: no viaja
+      ws.addRow(cols.map((c) => /** @type {any} */ (fila)[c]));
+    }
   }
   fs.mkdirSync(path.dirname(ruta), { recursive: true });
   await wb.xlsx.writeFile(ruta);
@@ -67,15 +70,17 @@ function hayDatosDelDocente(db) {
 }
 /**
  * Si el Excel viene de OTRA base y esta ya tiene datos, no se importa: se emparejan los registros por número
- * interno y se pisarían personas o materias distintas. (Un Excel sin código es de una versión anterior: se acepta.)
+ * interno y se pisarían personas o materias distintas. Un Excel sin código (de una versión anterior) tampoco se puede
+ * comprobar, así que solo se importa en una base vacía.
  * @param {import('node:sqlite').DatabaseSync} db @param {ExcelJS.Workbook} wb
  */
 function exigirMismaBase(db, wb) {
   const v = wb.getWorksheet('_version');
-  const delExcel = v ? String(v.getCell('B3').value ?? '') : '';
-  if (v?.getCell('A3').value === 'base_id' && delExcel && delExcel !== idDeBase(db) && hayDatosDelDocente(db)) {
-    throw new ErrorImportacion('OTRA_BASE', 'Este Excel es el respaldo de OTRA base de datos, no de la que está abierta. Para no mezclar ni pisar estudiantes distintos, no se importó nada. Para usarlo, abra el programa en una carpeta de datos nueva (vacía) e impórtelo allí.');
-  }
+  const delExcel = v && v.getCell('A3').value === 'base_id' ? String(v.getCell('B3').value ?? '') : '';
+  if (!hayDatosDelDocente(db) || (delExcel && delExcel === idDeBase(db))) return;
+  throw new ErrorImportacion('OTRA_BASE', delExcel
+    ? 'Este Excel es el respaldo de OTRA base de datos, no de la que está abierta. Para no mezclar ni pisar estudiantes distintos, no se importó nada. Para usarlo, abra el programa en una carpeta de datos nueva (vacía) e impórtelo allí.'
+    : 'Este Excel no indica de qué base de datos viene (es de una versión anterior del programa o fue modificado). Para no mezclar ni pisar datos, solo se puede importar en una carpeta de datos nueva (vacía): abra el programa allí e impórtelo.');
 }
 
 /** @param {string} ruta */
@@ -85,11 +90,11 @@ async function leerLibro(ruta) {
   catch (e) { throw new ErrorImportacion('ARCHIVO', `No se pudo leer el archivo como Excel: ${/** @type {Error} */ (e).message}`); }
   const v = wb.getWorksheet('_version');
   if (!v || v.getCell('A1').value !== 'esquema') {
-    throw new ErrorImportacion('VERSION', `Este archivo no es un respaldo de este programa (falta la hoja _version). Solo se entiende el esquema ${VERSION_ESQUEMA}.`);
+    throw new ErrorImportacion('VERSION', `Este archivo no es un respaldo de este programa (falta la hoja _version). Solo se entiende hasta el esquema ${VERSION_ESQUEMA}.`);
   }
   const version = Number(v.getCell('B1').value);
-  if (version !== VERSION_ESQUEMA) {
-    throw new ErrorImportacion('VERSION', `Este respaldo es del esquema ${version}; este programa solo entiende el esquema ${VERSION_ESQUEMA}.`);
+  if (!Number.isInteger(version) || version < 1 || version > VERSION_ESQUEMA) {
+    throw new ErrorImportacion('VERSION', `Este respaldo es del esquema ${v.getCell('B1').value}; este programa solo entiende hasta el esquema ${VERSION_ESQUEMA}. Si es más nuevo, actualice el programa.`);
   }
   return wb;
 }
@@ -126,6 +131,9 @@ const FIN_SIMULACION = Symbol('fin-simulacion');
 function procesar(db, wb, aplicar) {
   /** @type {ErrorCelda[]} */ const errores = [];
   /** @type {Resumen} */ const resumen = {};
+  const version = Number(wb.getWorksheet('_version')?.getCell('B1').value);
+  const antiguo = version < VERSION_ESQUEMA; // un respaldo de una versión anterior no tiene las tablas ni columnas añadidas después
+  const conDatos = hayDatosDelDocente(db);
   const hojasConocidas = new Set(['_version', ...TABLAS]);
   for (const ws of wb.worksheets) {
     if (!hojasConocidas.has(ws.name)) errores.push({ hoja: ws.name, fila: 0, columna: null, mensaje: 'Hoja desconocida: no pertenece a este respaldo' });
@@ -135,11 +143,14 @@ function procesar(db, wb, aplicar) {
       for (const t of TABLAS) {
         resumen[t] = { nuevos: 0, cambiados: 0, iguales: 0 };
         const ws = wb.getWorksheet(t);
-        if (!ws) { errores.push({ hoja: t, fila: 0, columna: null, mensaje: 'Falta la hoja' }); continue; }
+        if (!ws) { if (!antiguo) errores.push({ hoja: t, fila: 0, columna: null, mensaje: 'Falta la hoja' }); continue; }
         const cols = columnasDe(db, t);
         const encabezado = /** @type {any[]} */ (ws.getRow(1).values).slice(1).map((x) => (x == null ? '' : String(x)));
         const esperado = cols.map((c) => c.name);
-        if (encabezado.length !== esperado.length || esperado.some((n, i) => encabezado[i] !== n)) {
+        // Las versiones nuevas solo AÑADEN columnas al final: un respaldo antiguo trae un comienzo de la lista actual.
+        const ok = antiguo ? encabezado.length >= 1 && encabezado.length <= esperado.length && encabezado.every((n, i) => esperado[i] === n)
+          : encabezado.length === esperado.length && esperado.every((n, i) => encabezado[i] === n);
+        if (!ok) {
           errores.push({ hoja: t, fila: 1, columna: null, mensaje: `Las columnas no coinciden. Se esperaba: ${esperado.join(', ')}` });
           continue;
         }
@@ -181,6 +192,8 @@ function procesar(db, wb, aplicar) {
           });
           if (vacia) continue;
           if (malo) continue;
+          // Ajustes propios de cada equipo: la carpeta de la memoria USB nunca se importa, y la identidad de una base con datos no cambia.
+          if (t === 'config' && (reg['clave'] === 'respaldo.carpeta_extra' || (reg['clave'] === 'base.id' && conDatos))) continue;
           const previo = /** @type {Record<string, any> | undefined} */ (buscar.get(reg[pk]));
           const estado = !previo ? 'nuevos' : cols.every((c) => previo[c.name] === reg[c.name]) ? 'iguales' : 'cambiados';
           try {
