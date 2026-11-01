@@ -1,11 +1,11 @@
 # Trazabilidad: criterios de la spec contra lo construido (2026-10-31)
 
-Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado a la versión `v0.1.3`.
+Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado a la versión `v0.1.4`.
 **Cumplido** = implementado y probado. **Con desviación** = se hace, pero distinto a como lo dice la spec (se explica). **Pendiente** = no hecho.
 
 | Criterio | Estado | Evidencia / nota |
 |---|---|---|
-| CA-001-01 grados 0–5; materias por grado | **Con desviación** | Grados 0–5 sí. Las materias son comunes a todos los grados (no se crean por grado): el docente atiende todos los grados con las mismas materias. Validar con el docente si necesita materias distintas por grado. |
+| CA-001-01 grados 0–5; materias por grado | Cumplido (cerrado en v0.1.4) | Cada materia se marca con los grados donde se dicta (ninguno marcado = todos). Las pantallas de Notas y Planeación ofrecen solo las materias del grado, y el servidor rechaza notas, planes, guías, temas y clases de una materia fuera de sus grados. Lo ya escrito no se borra. `spec-cruce2.test.js`, Edge |
 | CA-001-02 estudiantes: crear, editar, archivar | Cumplido | `academico.test.js`, Edge |
 | CA-001-03 varios años; cerrado = solo lectura | Cumplido | Incluye reabrir año |
 | CA-001-04 multigrado | Cumplido | Todas las vistas filtran por grado |
@@ -18,7 +18,7 @@ Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado
 | CA-003-01 plan de nivelación (actividades, fecha, resultado) | Cumplido | Prueba en Edge real |
 | CA-003-02 nivelación aparte; boletín muestra ambas | Cumplido | |
 | CA-003-03 listado de pendientes | Cumplido | |
-| CA-004-01 plan de área con objetivos, estándares, competencias, contenidos por periodo, criterios | **Con desviación** | Un solo campo de texto, con una plantilla que ya trae esos cinco títulos al crear el plan. No son campos separados. |
+| CA-004-01 plan de área con objetivos, estándares, competencias, contenidos por periodo, criterios | Cumplido (cerrado en v0.1.4) | Campos separados: objetivos, estándares, competencias, contenidos de cada uno de los 4 periodos y criterios de evaluación, más «otras notas». El Word y el PDF los traen con su título; se copian al año siguiente; viajan en el Excel. `spec-cruce2.test.js`, Edge |
 | CA-004-02 plan de aula asociado a plan de área, grado y periodo | Cumplido (nuevo) | Misma materia y grado que su plan de área; `spec-cruce.test.js` |
 | CA-004-03 copiar planes al año siguiente | Cumplido (nuevo) | No duplica; conserva el enlace aula→área |
 | CA-004-04 planes a Word y PDF | Cumplido | |
@@ -43,5 +43,5 @@ Spec: `.sdd/especificaciones/2026-10-31-nucleo-notas-y-respaldo/spec.md`. Estado
 | CA-009-03 certificado con encabezado configurable | Cumplido | Formato provisional |
 | CA-009-04 tildes y eñes | Cumplido | PDF revisado a ojo; Word sin revisión visual |
 
-**Resumen:** 33 criterios; 31 cumplidos, 2 con desviación (CA-001-01, CA-004-01), 0 pendientes. 138 pruebas.
+**Resumen:** 33 criterios; 33 cumplidos, 0 con desviación, 0 pendientes. 148 pruebas.
 **Lo que ningún criterio cubre pero sigue sin verificar:** ejecución en el ASUS con Windows 10, los Word y el certificado a la vista, tres hallazgos bajos de la revisión independiente.

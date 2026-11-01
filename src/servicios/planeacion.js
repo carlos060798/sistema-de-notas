@@ -1,7 +1,7 @@
 // @ts-check
 // Planeación del docente: planes de área y de aula, guías, temas con avance y clases planeadas.
 import { conTransaccion } from '../datos/base.js';
-import { ErrorValidacion, exigirAnioAbierto, validarGrado, textoObligatorio } from './academico.js';
+import { ErrorValidacion, exigirAnioAbierto, validarGrado, textoObligatorio, materiaEnGrado } from './academico.js';
 
 /** @typedef {import('node:sqlite').DatabaseSync} Db */
 /** @param {Db} db @param {string} sql @param {...any} args @returns {any[]} */
@@ -9,10 +9,13 @@ const todos = (db, sql, ...args) => /** @type {any[]} */ (db.prepare(sql).all(..
 /** @param {Db} db @param {string} sql @param {...any} args @returns {any} */
 const uno = (db, sql, ...args) => db.prepare(sql).get(...args);
 
-/** @param {Db} db @param {unknown} id */
-function exigirMateria(db, id) {
+/** @param {Db} db @param {number} id @param {number} [grado] si se da, la materia debe ofrecerse en ese grado */
+function exigirMateria(db, id, grado) {
   if (!uno(db, 'select 1 x from materia where id = ?', id)) throw new ErrorValidacion('La materia no existe');
+  if (grado !== undefined && !materiaEnGrado(db, id, grado)) throw new ErrorValidacion('Esa materia no se ofrece en este grado (puede cambiarlo en «Año y materias»)');
 }
+/** Campos del plan de área (CA-004-01): objetivos, estándares, competencias, contenidos por periodo y criterios de evaluación. */
+export const CAMPOS_PLAN_AREA = /** @type {const} */ (['objetivos', 'estandares', 'competencias', 'contenidos_p1', 'contenidos_p2', 'contenidos_p3', 'contenidos_p4', 'criterios']);
 /** @param {unknown} v @param {string} msg @param {number} max */
 function texto(v, msg, max) {
   const t = textoObligatorio(v, msg);
@@ -40,10 +43,10 @@ const id = (/** @type {any} */ r) => Number(r.lastInsertRowid);
 
 // --- Planes -------------------------------------------------------------------------------------
 
-/** @param {Db} db @param {{ id?: number, tipo: string, anio_id: number, materia_id: number, grado: number, titulo: string, contenido?: string, periodo?: number | null, plan_area_id?: number | null }} d */
+/** @param {Db} db @param {{ id?: number, tipo: string, anio_id: number, materia_id: number, grado: number, titulo: string, contenido?: string, periodo?: number | null, plan_area_id?: number | null, objetivos?: string, estandares?: string, competencias?: string, contenidos_p1?: string, contenidos_p2?: string, contenidos_p3?: string, contenidos_p4?: string, criterios?: string }} d */
 export function guardarPlan(db, d) { // d.periodo y d.plan_area_id solo aplican a los planes de aula
   if (d.tipo !== 'area' && d.tipo !== 'aula') throw new ErrorValidacion('El tipo de plan debe ser «area» o «aula»');
-  exigirAnioAbierto(db, d.anio_id); exigirMateria(db, d.materia_id); validarGrado(d.grado);
+  exigirAnioAbierto(db, d.anio_id); validarGrado(d.grado); exigirMateria(db, d.materia_id, d.grado);
   const titulo = texto(d.titulo, 'Escriba el título del plan', 150); const contenido = libre(d.contenido, 'El contenido');
   // El plan de aula se asocia a un plan de área (de la misma materia y grado) y a un periodo; el de área no.
   let periodo = null; let areaId = null;
@@ -56,17 +59,19 @@ export function guardarPlan(db, d) { // d.periodo y d.plan_area_id solo aplican 
       areaId = d.plan_area_id;
     }
   }
+  // Solo el plan de área lleva los campos estructurados; el de aula usa «contenido».
+  const extra = CAMPOS_PLAN_AREA.map((c) => (d.tipo === 'area' ? libre(d[c], 'El campo «' + c.replace('_p', ' del periodo ') + '»') : ''));
   if (d.id) {
     if (!uno(db, 'select 1 x from plan where id = ?', d.id)) throw new ErrorValidacion('El plan no existe');
     if (areaId === d.id) throw new ErrorValidacion('Un plan no puede depender de sí mismo');
-    db.prepare('update plan set tipo=?, anio_id=?, materia_id=?, grado_id=?, titulo=?, contenido=?, periodo=?, plan_area_id=? where id=?').run(d.tipo, d.anio_id, d.materia_id, d.grado, titulo, contenido, periodo, areaId, d.id);
+    db.prepare('update plan set tipo=?, anio_id=?, materia_id=?, grado_id=?, titulo=?, contenido=?, periodo=?, plan_area_id=?, objetivos=?, estandares=?, competencias=?, contenidos_p1=?, contenidos_p2=?, contenidos_p3=?, contenidos_p4=?, criterios=? where id=?').run(d.tipo, d.anio_id, d.materia_id, d.grado, titulo, contenido, periodo, areaId, ...extra, d.id);
     return { id: d.id };
   }
-  return { id: id(db.prepare('insert into plan(tipo, anio_id, materia_id, grado_id, titulo, contenido, periodo, plan_area_id) values (?,?,?,?,?,?,?,?)').run(d.tipo, d.anio_id, d.materia_id, d.grado, titulo, contenido, periodo, areaId)) };
+  return { id: id(db.prepare('insert into plan(tipo, anio_id, materia_id, grado_id, titulo, contenido, periodo, plan_area_id, objetivos, estandares, competencias, contenidos_p1, contenidos_p2, contenidos_p3, contenidos_p4, criterios) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(d.tipo, d.anio_id, d.materia_id, d.grado, titulo, contenido, periodo, areaId, ...extra)) };
 }
 /** @param {Db} db @param {{ anio_id: number, tipo?: string, materia_id?: number, grado?: number }} q */
 export const listarPlanes = (db, q) => todos(db,
-  `select p.id, p.tipo, p.anio_id, p.materia_id, m.nombre materia, p.grado_id grado, p.titulo, p.contenido, p.periodo, p.plan_area_id from plan p join materia m on m.id = p.materia_id
+  `select p.id, p.tipo, p.anio_id, p.materia_id, m.nombre materia, p.grado_id grado, p.titulo, p.contenido, p.periodo, p.plan_area_id, p.objetivos, p.estandares, p.competencias, p.contenidos_p1, p.contenidos_p2, p.contenidos_p3, p.contenidos_p4, p.criterios from plan p join materia m on m.id = p.materia_id
    where p.anio_id = ? and (? is null or p.tipo = ?) and (? is null or p.materia_id = ?) and (? is null or p.grado_id = ?) order by p.grado_id, m.nombre, p.titulo`,
   q.anio_id, q.tipo ?? null, q.tipo ?? null, q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null);
 /** @param {Db} db @param {number} planId */
@@ -81,7 +86,7 @@ export function borrarPlan(db, planId) {
 
 /** @param {Db} db @param {{ id?: number, materia_id: number, grado: number, tema?: string, titulo: string, contenido?: string }} d */
 export function guardarGuia(db, d) {
-  exigirMateria(db, d.materia_id); validarGrado(d.grado);
+  validarGrado(d.grado); exigirMateria(db, d.materia_id, d.grado);
   const titulo = texto(d.titulo, 'Escriba el título de la guía', 150); const tema = (d.tema ?? '').trim().slice(0, 150); const contenido = libre(d.contenido, 'El contenido');
   if (d.id) {
     if (!uno(db, 'select 1 x from guia where id = ?', d.id)) throw new ErrorValidacion('La guía no existe');
@@ -113,7 +118,7 @@ const ESTADOS = ['pendiente', 'en_curso', 'visto'];
 
 /** @param {Db} db @param {{ id?: number, anio_id: number, materia_id: number, grado: number, periodo: number, nombre: string }} d */
 export function guardarTema(db, d) {
-  exigirAnioAbierto(db, d.anio_id); exigirMateria(db, d.materia_id); validarGrado(d.grado); validarPeriodo(d.periodo);
+  exigirAnioAbierto(db, d.anio_id); validarGrado(d.grado); exigirMateria(db, d.materia_id, d.grado); validarPeriodo(d.periodo);
   const nombre = texto(d.nombre, 'Escriba el nombre del tema', 150);
   if (d.id) {
     if (!uno(db, 'select 1 x from tema where id = ?', d.id)) throw new ErrorValidacion('El tema no existe');
@@ -157,7 +162,7 @@ export function borrarTema(db, temaId) {
 
 /** @param {Db} db @param {{ id?: number, anio_id: number, materia_id: number, grado: number, fecha: string, tema_id?: number | null, guia_id?: number | null, objetivo?: string, actividades?: string, recursos?: string }} d */
 export function guardarClase(db, d) {
-  exigirAnioAbierto(db, d.anio_id); exigirMateria(db, d.materia_id); validarGrado(d.grado);
+  exigirAnioAbierto(db, d.anio_id); validarGrado(d.grado); exigirMateria(db, d.materia_id, d.grado);
   const fecha = validarFecha(d.fecha);
   if (d.tema_id != null && !uno(db, 'select 1 x from tema where id = ? and anio_id = ?', d.tema_id, d.anio_id)) throw new ErrorValidacion('El tema no existe en este año');
   if (d.guia_id != null && !uno(db, 'select 1 x from guia where id = ?', d.guia_id)) throw new ErrorValidacion('La guía no existe');
@@ -248,7 +253,7 @@ export function copiarPlanes(db, d) {
       const igual = uno(db, 'select id from plan where anio_id = ? and tipo = ? and materia_id = ? and grado_id = ? and titulo = ? and periodo is ?', d.hasta_anio_id, p.tipo, p.materia_id, p.grado_id, p.titulo, p.periodo ?? null);
       if (igual) { nuevoId.set(Number(p.id), Number(igual.id)); omitidos++; continue; }
       const area = p.plan_area_id != null ? nuevoId.get(Number(p.plan_area_id)) ?? null : null;
-      const r = db.prepare('insert into plan(tipo, anio_id, materia_id, grado_id, titulo, contenido, periodo, plan_area_id) values (?,?,?,?,?,?,?,?)').run(p.tipo, d.hasta_anio_id, p.materia_id, p.grado_id, p.titulo, p.contenido, p.periodo ?? null, area);
+      const r = db.prepare('insert into plan(tipo, anio_id, materia_id, grado_id, titulo, contenido, periodo, plan_area_id, objetivos, estandares, competencias, contenidos_p1, contenidos_p2, contenidos_p3, contenidos_p4, criterios) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(p.tipo, d.hasta_anio_id, p.materia_id, p.grado_id, p.titulo, p.contenido, p.periodo ?? null, area, ...CAMPOS_PLAN_AREA.map((c) => p[c]));
       nuevoId.set(Number(p.id), Number(r.lastInsertRowid)); copiados++;
     }
     return { copiados, omitidos };

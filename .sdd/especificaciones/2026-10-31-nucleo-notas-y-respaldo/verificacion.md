@@ -24,3 +24,5 @@
 **Revisión independiente (T6.4): realizada** por un agente distinto del que construyó (reportes/2026-10-31-revision-independiente.md). Hallazgos altos y medios corregidos el mismo día (ver «Respuesta del equipo» en el informe); quedan 3 bajos sin atender. Copia a USB (CA-007-05) ahora implementada. 127 pruebas.
 
 **Cruce contra los criterios de la spec:** ver `docs/TRAZABILIDAD-SPEC.md`. De 33 criterios, 31 cumplidos y 2 con desviación (materias comunes a todos los grados; plan de área como un solo texto con plantilla). Añadido en este cruce: nota mínima configurable, lista de quienes no aprueban, plan de aula enlazado a plan de área y periodo, copiar planes al año siguiente, búsqueda de guías por palabra, avance por periodo, clase con guía, asistencia, observaciones del boletín y copias a conservar configurables. 138 pruebas.
+
+**v0.1.4:** cerradas las dos desviaciones de la spec (materias por grado; plan de área con campos separados): 33 de 33 criterios cumplidos (`docs/TRAZABILIDAD-SPEC.md`). Atendidos los tres hallazgos bajos de la revisión independiente (el del Excel en curso, sin prueba automática). 148 pruebas.

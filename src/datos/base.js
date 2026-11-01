@@ -123,6 +123,22 @@ const MIGRACIONES = [
     texto text not null
   );
   `,
+  `
+  create table materia_grado (
+    id integer primary key,
+    materia_id integer not null references materia(id),
+    grado_id integer not null references grado(id),
+    unique (materia_id, grado_id)
+  );
+  alter table plan add column objetivos text not null default '';
+  alter table plan add column estandares text not null default '';
+  alter table plan add column competencias text not null default '';
+  alter table plan add column contenidos_p1 text not null default '';
+  alter table plan add column contenidos_p2 text not null default '';
+  alter table plan add column contenidos_p3 text not null default '';
+  alter table plan add column contenidos_p4 text not null default '';
+  alter table plan add column criterios text not null default '';
+  `,
 ];
 
 export const VERSION_ESQUEMA = MIGRACIONES.length;

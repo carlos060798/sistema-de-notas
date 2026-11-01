@@ -79,6 +79,8 @@ En ambos casos el docente vuelve a la ventana, escribe notas y recibe «No se pu
 | Medio — nivelación bloqueada en año cerrado | Nuevo «Reabrir año» (con confirmación). | `revision.test.js` |
 | Medio — texto «recupera todo» | Las pantallas ahora dicen que los adjuntos de guías no van en el Excel. | — |
 | Medio — bloqueo de instancia no atómico | Archivo creado con `wx`; el arranque perdedor se retira y se une al ganador. | `arranque.test.js` (arranque simultáneo); mutación detectada (la prueba se cuelga sin el bloqueo atómico) |
-| Bajos (3) | No atendidos todavía. | — |
+| Bajo 9 — Excel en curso y restauración | La restauración se rechaza con un mensaje claro mientras se lee o escribe un Excel. | Por inspección: sin prueba automática |
+| Bajo 10 — nivelación con materia inexistente | Valida la materia (mensaje claro, no error 500). | `spec-cruce2.test.js` |
+| Bajo 11 — retención «antes-de-…» común | Un tope de 5 por cada motivo. | `spec-cruce2.test.js` |
 
 127 pruebas, tipos en 0, .exe reconstruido y con humo OK.

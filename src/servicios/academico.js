@@ -89,8 +89,36 @@ export function renombrarMateria(db, id, nombre) {
   db.prepare('update materia set nombre = ? where id = ?').run(n, id);
   return { id, nombre: n };
 }
-/** @param {Db} db @returns {{ id: number, nombre: string }[]} */
-export const listarMaterias = (db) => todos(db, 'select id, nombre from materia').sort((a, b) => es.compare(a.nombre, b.nombre));
+/** @param {Db} db */
+export const listarMaterias = (db) => {
+  const filas = todos(db, 'select id, nombre from materia').sort((a, b) => es.compare(a.nombre, b.nombre));
+  const grados = todos(db, 'select materia_id, grado_id from materia_grado order by grado_id');
+  return filas.map((m) => { const g = grados.filter((x) => x.materia_id === m.id).map((x) => /** @type {number} */ (x.grado_id)); return { id: /** @type {number} */ (m.id), nombre: /** @type {string} */ (m.nombre), grados: g.length ? g : /** @type {number[] | null} */ (null) }; });
+};
+
+/**
+ * ¿Se ofrece esta materia en este grado? Una materia sin grados marcados se ofrece en todos.
+ * @param {Db} db @param {number} materiaId @param {number} grado
+ */
+export function materiaEnGrado(db, materiaId, grado) {
+  if (!uno(db, 'select 1 x from materia_grado where materia_id = ?', materiaId)) return true;
+  return !!uno(db, 'select 1 x from materia_grado where materia_id = ? and grado_id = ?', materiaId, grado);
+}
+/**
+ * Elige en qué grados se ofrece una materia (lista vacía = en todos). Las notas ya escritas no se tocan.
+ * @param {Db} db @param {number} materiaId @param {number[]} grados
+ */
+export function guardarGradosMateria(db, materiaId, grados) {
+  if (!uno(db, 'select 1 x from materia where id = ?', materiaId)) throw new ErrorValidacion('La materia no existe');
+  if (!Array.isArray(grados)) throw new ErrorValidacion('Elija los grados de la lista');
+  const limpios = [...new Set(grados)];
+  for (const g of limpios) validarGrado(g);
+  return conTransaccion(db, () => {
+    db.prepare('delete from materia_grado where materia_id = ?').run(materiaId);
+    for (const g of limpios) db.prepare('insert into materia_grado(materia_id, grado_id) values (?, ?)').run(materiaId, g);
+    return limpios.sort((x, y) => x - y);
+  });
+}
 
 // --- Estudiantes --------------------------------------------------------------------------------
 
@@ -160,9 +188,10 @@ function notaOpcional(v) {
 export function guardarNotas(db, d) {
   validarPeriodo(d.periodo);
   const n1 = notaOpcional(d.n1); const n2 = notaOpcional(d.n2); const n3 = notaOpcional(d.n3);
-  const mat = f(uno(db, 'select anio_id from matricula where id = ?', d.matricula_id));
+  const mat = f(uno(db, 'select anio_id, grado_id from matricula where id = ?', d.matricula_id));
   if (!mat) throw new ErrorValidacion('La matrícula no existe');
   if (!uno(db, 'select 1 x from materia where id = ?', d.materia_id)) throw new ErrorValidacion('La materia no existe');
+  if (!materiaEnGrado(db, d.materia_id, mat.grado_id)) throw new ErrorValidacion('Esa materia no se ofrece en el grado de este estudiante (puede cambiarlo en «Año y materias»)');
   exigirAnioAbierto(db, mat.anio_id);
   db.prepare(
     `insert into nota(matricula_id, materia_id, periodo, n1, n2, n3) values (?, ?, ?, ?, ?, ?)
@@ -243,6 +272,7 @@ export function desaprobadas(db, q) {
 export function guardarNivelacion(db, d) {
   const mat = f(uno(db, 'select anio_id from matricula where id = ?', d.matricula_id));
   if (!mat) throw new ErrorValidacion('La matrícula no existe');
+  if (!uno(db, 'select 1 x from materia where id = ?', d.materia_id)) throw new ErrorValidacion('La materia no existe');
   exigirAnioAbierto(db, mat.anio_id);
   const nota = notaOpcional(d.nota);
   let fecha = null;

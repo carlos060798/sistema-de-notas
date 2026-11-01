@@ -10,9 +10,9 @@ import { conTransaccion, VERSION_ESQUEMA } from '../datos/base.js';
 import { validarNota } from '../dominio/notas.js';
 
 /** Orden de dependencias: los padres antes que los hijos. */
-export const TABLAS = ['anio_lectivo', 'grado', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion'];
+export const TABLAS = ['anio_lectivo', 'grado', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion', 'materia_grado'];
 const COLUMNAS_NOTA = /** @type {Record<string, string[]>} */ ({ nota: ['n1', 'n2', 'n3'], nivelacion: ['nota'] });
-const CON_DATOS_DEL_DOCENTE = ['anio_lectivo', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion'];
+const CON_DATOS_DEL_DOCENTE = ['anio_lectivo', 'materia', 'estudiante', 'matricula', 'nota', 'nivelacion', 'config', 'plan', 'guia', 'tema', 'clase', 'asistencia', 'observacion', 'materia_grado'];
 
 /** @typedef {{ hoja: string, fila: number, columna: string | null, mensaje: string }} ErrorCelda */
 /** @typedef {Record<string, { nuevos: number, cambiados: number, iguales: number }>} Resumen */

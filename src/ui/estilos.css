@@ -106,3 +106,7 @@ details.menu-doc .menu-lista button:hover { background: var(--marca-suave); }
 .apariencia { margin: 18px 8px 0; background: transparent; color: var(--lateral-texto); border: 1px solid rgba(255, 255, 255, .35); border-radius: 10px; padding: 8px 12px; font: inherit; font-size: .95rem; cursor: pointer; text-align: left; }
 .apariencia:hover { background: rgba(255, 255, 255, .08); }
 .apariencia:focus-visible { outline: 3px solid #fff; outline-offset: 1px; }
+
+label.casilla { flex-direction: row; align-items: center; gap: 8px; margin: 4px 6px; color: var(--texto); }
+label.casilla input { width: 1.2em; height: 1.2em; }
+details.menu-doc .menu-lista p { margin: 4px 6px; max-width: 260px; }

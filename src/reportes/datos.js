@@ -83,11 +83,18 @@ export function guardarInstitucion(db, d) {
  */
 export function datosTexto(db, tipo, id) {
   const fila = /** @type {any} */ (tipo === 'plan'
-    ? db.prepare('select p.titulo, p.contenido, p.tipo, p.grado_id grado, m.nombre materia, a.anio from plan p join materia m on m.id = p.materia_id join anio_lectivo a on a.id = p.anio_id where p.id = ?').get(id)
+    ? db.prepare('select p.titulo, p.contenido, p.tipo, p.grado_id grado, m.nombre materia, a.anio, p.objetivos, p.estandares, p.competencias, p.contenidos_p1, p.contenidos_p2, p.contenidos_p3, p.contenidos_p4, p.criterios from plan p join materia m on m.id = p.materia_id join anio_lectivo a on a.id = p.anio_id where p.id = ?').get(id)
     : db.prepare('select g.titulo, g.contenido, g.tema, g.grado_id grado, m.nombre materia from guia g join materia m on m.id = g.materia_id where g.id = ?').get(id));
   if (!fila) throw new ErrorValidacion(tipo === 'plan' ? 'El plan no existe' : 'La guía no existe');
   const subtitulo = tipo === 'plan'
     ? `${fila.tipo === 'area' ? 'Plan de área' : 'Plan de aula'} — ${fila.materia} — ${NOMBRES_GRADO[fila.grado]} — ${fila.anio}`
     : `Guía — ${fila.materia} — ${NOMBRES_GRADO[fila.grado]}${fila.tema ? ' — ' + fila.tema : ''}`;
-  return { ...encabezado(db), titulo: String(fila.titulo), subtitulo, contenido: String(fila.contenido), anio: Number(fila.anio ?? new Date().getFullYear()) };
+  let contenido = String(fila.contenido);
+  if (tipo === 'plan' && fila.tipo === 'area') {
+    const secciones = /** @type {[string, string][]} */ ([['Objetivos', fila.objetivos], ['Estándares', fila.estandares], ['Competencias', fila.competencias],
+      ['Contenidos del periodo 1', fila.contenidos_p1], ['Contenidos del periodo 2', fila.contenidos_p2], ['Contenidos del periodo 3', fila.contenidos_p3], ['Contenidos del periodo 4', fila.contenidos_p4],
+      ['Criterios de evaluación', fila.criterios], ['Otras notas', fila.contenido]]);
+    contenido = secciones.filter(([, t]) => String(t ?? '').trim()).map(([t, x]) => t + '\n' + String(x).trim()).join('\n\n');
+  }
+  return { ...encabezado(db), titulo: String(fila.titulo), subtitulo, contenido, anio: Number(fila.anio ?? new Date().getFullYear()) };
 }

@@ -147,5 +147,20 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   const hoyISO = new Date().toISOString().slice(0, 10);
   const asis = await (await fetch(`${app.url}/api/asistencia?anio_id=${anio.id}&grado=0&fecha=${hoyISO}`, { headers: { 'x-token': app.token } })).json();
   assert.equal(asis[0].estado, 'ausente');
+
+  // Plan de área con campos separados: se llena «Objetivos» y se guarda
+  await menu('Planeación');
+  await ev(`[...document.querySelectorAll('.pestanas button')].find((b) => b.textContent === 'Planes de área y aula').click()`);
+  await hasta(`document.querySelectorAll('textarea').length`, 9); // 8 campos del plan de área + «Otras notas»
+  await ev(`(() => { document.querySelector('input[type=text]').value = 'Plan de transición'; document.querySelector('textarea').value = 'Contar hasta 20'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar plan').click(); })()`);
+  await hasta(`document.getElementById('aviso').textContent`, 'Plan guardado');
+  const planes = await (await fetch(`${app.url}/api/planes?anio_id=${anio.id}&tipo=area`, { headers: { 'x-token': app.token } })).json();
+  assert.equal(planes[0].objetivos, 'Contar hasta 20');
+  // Materias por grado: si Matemáticas solo se dicta en Cuarto, el grado 0 se queda sin materias y la pantalla lo explica
+  await post(`/api/materias/${mat.id}/grados`, { grados: [4] }, 'PUT');
+  await menu('Notas');
+  await hasta(`document.body.textContent.includes('Este grado no tiene materias')`, true);
+  await menu('Año y materias');
+  await hasta(`document.body.textContent.includes('Cuarto')`, true);
   assert.deepEqual(errores, []);
 });

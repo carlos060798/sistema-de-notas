@@ -57,7 +57,8 @@ export function aplicarRetencion(carpeta, n) {
   const copias = listarCopias(carpeta);
   const sobrantes = [
     ...copias.filter((c) => AUTOMATICOS.has(c.motivo)).slice(n),
-    ...copias.filter((c) => c.motivo.startsWith('antes-de-')).slice(MAX_ANTES_DE_RESTAURAR),
+    // un tope por cada motivo: varias importaciones seguidas no deben sacar la única copia «antes-de-restaurar»
+    ...[...new Set(copias.filter((c) => c.motivo.startsWith('antes-de-')).map((c) => c.motivo))].flatMap((m) => copias.filter((c) => c.motivo === m).slice(MAX_ANTES_DE_RESTAURAR)),
   ];
   for (const c of sobrantes) fs.rmSync(c.ruta, { force: true });
 }

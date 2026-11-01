@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { abrirBase, VERSION_ESQUEMA } from '../datos/base.js';
 import {
   ErrorValidacion, crearAnio, cerrarAnio, reabrirAnio, listarAnios, crearMateria, listarMaterias,
-  crearEstudiante, editarEstudiante, renombrarMateria, leerUmbral, guardarUmbral, archivarEstudiante, listarEstudiantes,
+  crearEstudiante, editarEstudiante, renombrarMateria, guardarGradosMateria, leerUmbral, guardarUmbral, archivarEstudiante, listarEstudiantes,
   guardarNotas, listarNotas, desaprobadas, guardarNivelacion, pendientesNivelacion,
 } from '../servicios/academico.js';
 import { resumen, registrarExcelDescargado } from '../servicios/resumen.js';
@@ -93,8 +93,10 @@ export function crearServidor(opciones) {
     return c;
   };
 
+  let excelEnCurso = 0; // un Excel que se está leyendo o escribiendo no debe cruzarse con una restauración
   /** Cierra la base, restaura, reabre. */
   const restaurarCopia = (/** @type {string} */ rutaCopia) => {
+    if (excelEnCurso > 0) throw new ErrorValidacion('Hay un Excel procesándose. Espere unos segundos y vuelva a intentar.');
     if (!ctx.rutaBase) throw new ErrorValidacion('Esta sesión no tiene archivo de base: no se puede restaurar');
     if (!verificarCopia(rutaCopia).ok) throw new ErrorValidacion('La copia no es válida; no se tocó nada');
     try { ctx.db?.close(); } catch { /* ya cerrada */ }
@@ -133,6 +135,7 @@ export function crearServidor(opciones) {
     { metodo: 'PUT', patron: /^\/api\/observaciones$/, cuerpo: 'json', h: ({ b }) => { PL.guardarObservacion(bd(), b ?? {}); return { json: { ok: true } }; } },
     { metodo: 'GET', patron: /^\/api\/institucion$/, cuerpo: null, h: () => ({ json: encabezado(bd()) }) },
     { metodo: 'PUT', patron: /^\/api\/institucion$/, cuerpo: 'json', h: ({ b }) => { guardarInstitucion(bd(), b ?? {}); return { json: encabezado(bd()) }; } },
+    { metodo: 'PUT', patron: /^\/api\/materias\/(\d+)\/grados$/, cuerpo: 'json', h: ({ p, b }) => ({ json: { grados: guardarGradosMateria(bd(), Number(p[0]), b?.grados) } }) },
     { metodo: 'PUT', patron: /^\/api\/materias\/(\d+)$/, cuerpo: 'json', h: ({ p, b }) => ({ json: renombrarMateria(bd(), Number(p[0]), b?.nombre) }) },
     { metodo: 'POST', patron: /^\/api\/materias$/, cuerpo: 'json', h: ({ b }) => ({ json: crearMateria(bd(), b?.nombre) }) },
 
@@ -194,7 +197,7 @@ export function crearServidor(opciones) {
     { metodo: 'GET', patron: /^\/api\/excel$/, cuerpo: null, h: async () => {
       const tmp = path.join(os.tmpdir(), `notas-xlsx-${crypto.randomUUID()}.xlsx`);
       try {
-        await exportarExcel(bd(), tmp);
+        excelEnCurso++; try { await exportarExcel(bd(), tmp); } finally { excelEnCurso--; }
         registrarExcelDescargado(bd());
         return { raw: fs.readFileSync(tmp), headers: {
           'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -233,7 +236,8 @@ export function crearServidor(opciones) {
   async function conArchivo(datos, fn) {
     const tmp = path.join(os.tmpdir(), `notas-in-${crypto.randomUUID()}.xlsx`);
     fs.writeFileSync(tmp, datos);
-    try { return await fn(tmp); } finally { fs.rmSync(tmp, { force: true }); }
+    excelEnCurso++;
+    try { return await fn(tmp); } finally { excelEnCurso--; fs.rmSync(tmp, { force: true }); }
   }
 
   /** @param {http.IncomingMessage} req @param {number} limite @returns {Promise<Buffer>} */
