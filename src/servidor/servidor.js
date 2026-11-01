@@ -15,7 +15,7 @@ import {
 } from '../servicios/academico.js';
 import * as PL from '../servicios/planeacion.js';
 import { crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
-import { datosPlanilla, datosBoletin } from '../reportes/datos.js';
+import { datosPlanilla, datosBoletin, datosTexto, guardarInstitucion, encabezado } from '../reportes/datos.js';
 import * as FM from '../reportes/formatos.js';
 import { exportarExcel, analizarExcel, importarExcel, ErrorImportacion } from '../excel/excel.js';
 
@@ -118,6 +118,8 @@ export function crearServidor(opciones) {
 
     { metodo: 'POST', patron: /^\/api\/anios$/, cuerpo: 'json', h: ({ b }) => ({ json: crearAnio(bd(), b?.anio) }) },
     { metodo: 'POST', patron: /^\/api\/anios\/(\d+)\/cerrar$/, cuerpo: null, h: ({ p }) => { cerrarAnio(bd(), Number(p[0])); return { json: { ok: true } }; } },
+    { metodo: 'GET', patron: /^\/api\/institucion$/, cuerpo: null, h: () => ({ json: encabezado(bd()) }) },
+    { metodo: 'PUT', patron: /^\/api\/institucion$/, cuerpo: 'json', h: ({ b }) => { guardarInstitucion(bd(), b ?? {}); return { json: encabezado(bd()) }; } },
     { metodo: 'POST', patron: /^\/api\/materias$/, cuerpo: 'json', h: ({ b }) => ({ json: crearMateria(bd(), b?.nombre) }) },
 
     { metodo: 'GET', patron: /^\/api\/estudiantes$/, cuerpo: null, h: ({ q }) => ({
@@ -180,20 +182,21 @@ export function crearServidor(opciones) {
       } finally { fs.rmSync(tmp, { force: true }); }
     } },
     // Documentos: planilla (xlsx|pdf), boletín y certificado (pdf|docx)
-    { metodo: 'GET', patron: /^\/api\/reportes\/(planilla|boletin|certificado)$/, cuerpo: null, h: async ({ p, q }) => {
+    { metodo: 'GET', patron: /^\/api\/reportes\/(planilla|boletin|certificado|plan|guia)$/, cuerpo: null, h: async ({ p, q }) => {
       const tipo = p[0]; const formato = q.get('formato') ?? '';
-      const permitidos = { planilla: ['xlsx', 'pdf'], boletin: ['pdf', 'docx'], certificado: ['pdf', 'docx'] }[tipo] ?? [];
+      const permitidos = { planilla: ['xlsx', 'pdf'], boletin: ['pdf', 'docx'], certificado: ['pdf', 'docx'], plan: ['pdf', 'docx'], guia: ['pdf', 'docx'] }[tipo] ?? [];
       if (!permitidos.includes(formato)) throw new ErrorValidacion(`El formato debe ser ${permitidos.join(' o ')}`);
-      const anio_id = enteroObligatorio(q.get('anio_id'), 'anio_id');
-      const datos = tipo === 'planilla'
+      const texto = tipo === 'plan' || tipo === 'guia';
+      const anio_id = texto ? 0 : enteroObligatorio(q.get('anio_id'), 'anio_id');
+      const datos = texto ? datosTexto(bd(), tipo, enteroObligatorio(q.get('id'), 'id')) : tipo === 'planilla'
         ? datosPlanilla(bd(), { anio_id, grado: enteroObligatorio(q.get('grado'), 'grado'), materia_id: enteroObligatorio(q.get('materia_id'), 'materia_id') })
         : datosBoletin(bd(), { anio_id, matricula_id: enteroObligatorio(q.get('matricula_id'), 'matricula_id') });
-      const dibujar = /** @type {Record<string, Function>} */ ({ 'planilla.xlsx': FM.planillaExcel, 'planilla.pdf': FM.planillaPdf, 'boletin.pdf': FM.boletinPdf, 'boletin.docx': FM.boletinDocx, 'certificado.pdf': FM.certificadoPdf, 'certificado.docx': FM.certificadoDocx })[tipo + '.' + formato];
+      const dibujar = /** @type {Record<string, Function>} */ ({ 'planilla.xlsx': FM.planillaExcel, 'planilla.pdf': FM.planillaPdf, 'boletin.pdf': FM.boletinPdf, 'boletin.docx': FM.boletinDocx, 'certificado.pdf': FM.certificadoPdf, 'certificado.docx': FM.certificadoDocx, 'plan.pdf': FM.textoPdf, 'plan.docx': FM.textoDocx, 'guia.pdf': FM.textoPdf, 'guia.docx': FM.textoDocx })[tipo + '.' + formato];
       const tmp = path.join(os.tmpdir(), `notas-doc-${crypto.randomUUID()}.${formato}`);
       const tipos = { xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
       try {
         await dibujar(datos, tmp);
-        const nombre = encodeURIComponent(`${tipo}-${(/** @type {any} */ (datos).estudiante ?? /** @type {any} */ (datos).materia).replace(/\s+/g, '-')}-${/** @type {any} */ (datos).anio}.${formato}`);
+        const nombre = encodeURIComponent(`${tipo}-${(/** @type {any} */ (datos).estudiante ?? /** @type {any} */ (datos).materia ?? /** @type {any} */ (datos).titulo).replace(/\s+/g, '-')}-${/** @type {any} */ (datos).anio}.${formato}`);
         return { raw: fs.readFileSync(tmp), headers: { 'content-type': /** @type {Record<string, string>} */ (tipos)[formato], 'content-disposition': `attachment; filename*=UTF-8''${nombre}` } };
       } finally { fs.rmSync(tmp, { force: true }); }
     } },

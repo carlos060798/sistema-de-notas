@@ -64,3 +64,29 @@ export function datosBoletin(db, q) {
     situacion: !completas ? 'En curso' : reprobadas.length === 0 ? 'Aprobó todas las materias' : 'Tiene materias por nivelar',
   };
 }
+
+/** Guarda los datos de la institución que salen en el encabezado de los documentos. @param {Db} db @param {{ nombre?: string, sede?: string, docente?: string }} d */
+export function guardarInstitucion(db, d) {
+  const campos = /** @type {const} */ (['nombre', 'sede', 'docente']);
+  for (const c of campos) {
+    const v = (d[c] ?? '').trim();
+    if (v.length > 120) throw new ErrorValidacion(`El campo «${c}» es demasiado largo (máximo 120 letras)`);
+    if (v) db.prepare('insert into config(clave, valor) values (?, ?) on conflict(clave) do update set valor = excluded.valor').run(`institucion.${c}`, v);
+    else db.prepare('delete from config where clave = ?').run(`institucion.${c}`);
+  }
+}
+
+/**
+ * Plan o guía como documento de texto (título, subtítulo y contenido).
+ * @param {Db} db @param {'plan' | 'guia'} tipo @param {number} id
+ */
+export function datosTexto(db, tipo, id) {
+  const fila = /** @type {any} */ (tipo === 'plan'
+    ? db.prepare('select p.titulo, p.contenido, p.tipo, p.grado_id grado, m.nombre materia, a.anio from plan p join materia m on m.id = p.materia_id join anio_lectivo a on a.id = p.anio_id where p.id = ?').get(id)
+    : db.prepare('select g.titulo, g.contenido, g.tema, g.grado_id grado, m.nombre materia from guia g join materia m on m.id = g.materia_id where g.id = ?').get(id));
+  if (!fila) throw new ErrorValidacion(tipo === 'plan' ? 'El plan no existe' : 'La guía no existe');
+  const subtitulo = tipo === 'plan'
+    ? `${fila.tipo === 'area' ? 'Plan de área' : 'Plan de aula'} — ${fila.materia} — ${NOMBRES_GRADO[fila.grado]} — ${fila.anio}`
+    : `Guía — ${fila.materia} — ${NOMBRES_GRADO[fila.grado]}${fila.tema ? ' — ' + fila.tema : ''}`;
+  return { ...encabezado(db), titulo: String(fila.titulo), subtitulo, contenido: String(fila.contenido), anio: Number(fila.anio ?? new Date().getFullYear()) };
+}

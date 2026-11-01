@@ -86,5 +86,22 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await hasta(`document.querySelectorAll('tbody tr').length`, 1);
   await ev(`(() => { const s = document.querySelector('tbody select'); s.value = 'visto'; s.dispatchEvent(new Event('change')); })()`);
   await hasta(`document.querySelector('h3').textContent`, 'Avance: 1 de 1 temas vistos (100 %)');
+
+  // Estudiantes: lista con acciones de boletín
+  const menu = (/** @type {string} */ t) => ev(`[...document.querySelectorAll('#menu button')].find((b) => b.textContent === ${JSON.stringify(t)}).click()`);
+  await menu('Estudiantes');
+  await hasta(`[...document.querySelectorAll('tbody tr')].map((t) => t.children[0].textContent).join('|')`, 'Transición (0) — 2 estudiantes|Ana Ñañez|Beto Pérez'); // una fila de grupo por grado
+  assert.equal(await ev(`[...document.querySelectorAll('tbody button')].filter((b) => b.textContent === 'Boletín PDF').length`), 2);
+  // Copias: crear una copia ahora
+  await menu('Copias y Excel');
+  await hasta(`!![...document.querySelectorAll('button')].find((b) => b.textContent === 'Crear copia ahora')`, true);
+  await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent === 'Crear copia ahora').click()`);
+  await hasta(`document.getElementById('aviso').textContent`, 'Copia creada');
+  // Año y materias: guardar los datos de la institución
+  await menu('Año y materias');
+  await hasta(`document.querySelectorAll('input[type=text]').length > 2`, true);
+  await ev(`(() => { document.querySelectorAll('input[type=text]')[0].value = 'Escuela El Roble'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar datos').click(); })()`);
+  await hasta(`document.getElementById('aviso').textContent`, 'Datos guardados');
+  assert.equal((await (await fetch(`${app.url}/api/institucion`, { headers: { 'x-token': app.token } })).json()).institucion, 'Escuela El Roble');
   assert.deepEqual(errores, []);
 });

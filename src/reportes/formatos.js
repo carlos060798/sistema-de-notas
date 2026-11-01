@@ -127,3 +127,26 @@ export function certificadoDocx(d, ruta) {
     new Paragraph(''), new Paragraph('_____________________________'), new Paragraph(d.docente || 'Docente'),
   ] }] }), ruta);
 }
+
+// --- Planes y guías (texto) ----------------------------------------------------------------------
+
+/** @typedef {ReturnType<typeof import('./datos.js').datosTexto>} Texto */
+
+/** @param {Texto} d @param {string} ruta */
+export function textoPdf(d, ruta) {
+  return escribirPdf(ruta, (doc) => {
+    if (titulo(d)) doc.font('Helvetica').fontSize(10).text(titulo(d));
+    doc.font('Helvetica-Bold').fontSize(15).text(d.titulo).moveDown(0.2);
+    doc.font('Helvetica').fontSize(10).text(d.subtitulo).moveDown();
+    doc.fontSize(11).text(d.contenido || '(sin contenido)', { align: 'left' });
+  });
+}
+/** @param {Texto} d @param {string} ruta */
+export function textoDocx(d, ruta) {
+  return guardarDocx(new Document({ sections: [{ children: [
+    ...(titulo(d) ? [new Paragraph(titulo(d))] : []),
+    new Paragraph({ text: d.titulo, heading: HeadingLevel.HEADING_1 }),
+    new Paragraph(d.subtitulo),
+    ...(d.contenido || '(sin contenido)').split(/\r?\n/).map((l) => new Paragraph(l)),
+  ] }] }), ruta);
+}

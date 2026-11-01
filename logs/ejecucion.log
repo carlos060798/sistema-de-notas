@@ -20,3 +20,4 @@
 2026-11-01T00:55:23Z | F4 | ok | planeacion: planes, guias, temas/avance, clases; 104 pruebas; guias sin adjuntos (a validar)
 2026-11-01T01:03:36Z | F5 | ok | documentos: planilla xlsx/pdf, boletin y certificado pdf/docx; 110 pruebas; corregida carrera de guardado en UI
 2026-11-01T01:10:32Z | F6 | aviso | empaquetado OK local (exe 96MB, 77MB RAM, humo OK); CI sin ejecutar; revision independiente pendiente
+2026-11-01T01:16:11Z | F6 | ok | institucion, plan/guia a Word y PDF, UI probada en Edge; 111 pruebas; exe reconstruido OK

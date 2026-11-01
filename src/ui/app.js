@@ -344,9 +344,16 @@ function informeImportacion(datos, archivo) {
 // --- Año y materias -----------------------------------------------------------------------------
 
 async function pantallaConfig(cont) {
+  const inst = await json('GET', '/api/institucion');
+  const campoInst = (clave, etiqueta) => { const i = h('input', { type: 'text', maxlength: 120, value: inst[clave] ?? '' }); return [h('label', {}, etiqueta, i), i]; };
+  const [lNom, iNom] = campoInst('institucion', 'Nombre de la institución'); const [lSede, iSede] = campoInst('sede', 'Sede'); const [lDoc, iDoc] = campoInst('docente', 'Docente');
   const anio = h('input', { type: 'number', min: 2000, max: 2100, value: new Date().getFullYear(), class: 'corto' });
   const mat = h('input', { type: 'text', maxlength: 80, autocomplete: 'off' });
   cont.replaceChildren(
+    h('section', { class: 'tarjeta' }, h('h2', {}, 'Datos de la institución'),
+      h('p', { class: 'suave' }, 'Salen en el encabezado de planillas, boletines y certificados. Son opcionales.'),
+      h('form', { class: 'fila', onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('PUT', '/api/institucion', { nombre: iNom.value, sede: iSede.value, docente: iDoc.value }); aviso('Datos guardados'); }); } },
+        lNom, lSede, lDoc, h('button', { class: 'principal', type: 'submit' }, 'Guardar datos'))),
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Año lectivo'),
       h('form', { onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('POST', '/api/anios', { anio: Number(anio.value) }); aviso('Año creado'); mostrar(); }); } },
         h('label', {}, 'Año', anio), h('button', { class: 'principal', type: 'submit' }, 'Crear año')),
@@ -452,6 +459,8 @@ async function seccionPlanes(filtro) {
     }) }, 'Guardar plan'),
     ...planes.map((p) => h('details', {}, h('summary', {}, `${p.tipo === 'area' ? 'Área' : 'Aula'} — ${p.titulo}`),
       h('pre', { class: 'texto' }, p.contenido),
+      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=docx`) }, 'Word'), ' ',
+      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/plan?id=${p.id}&formato=pdf`) }, 'PDF'), ' ',
       h('button', { onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar'))));
 }
 
@@ -465,6 +474,8 @@ async function seccionGuias() {
     }) }, 'Guardar guía'),
     ...guias.map((g) => h('details', {}, h('summary', {}, `${g.tema ? g.tema + ' — ' : ''}${g.titulo}`),
       h('pre', { class: 'texto' }, g.contenido),
+      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=docx`) }, 'Word'), ' ',
+      h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=pdf`) }, 'PDF'), ' ',
       h('button', { onclick: () => { if (confirm(`¿Quitar la guía «${g.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/guias/${g.id}`); mostrar(); }); } }, 'Quitar'))));
 }
 

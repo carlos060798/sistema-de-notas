@@ -34,7 +34,7 @@
 ## F5 Reportes
 - [x] **T5.1** Planilla en `.xlsx` y `.pdf`. Cubre CA-009-01.
 - [x] **T5.2** Boletín y certificado en `.pdf` y `.docx`. Cubre CA-009-02 a 04.
-- [~] **T5.3** Planes y guías a Word y PDF. Cubre CA-004-04, CA-005-03. (parcial: planes y guías aún sin exportar a Word/PDF)
+- [x] **T5.3** Planes y guías a Word y PDF. Cubre CA-004-04, CA-005-03.
 
 ## F6 Empaquetado y cierre
 - [x] **T6.1** `esbuild` + SEA + GitHub Actions que publica el `.exe`.
