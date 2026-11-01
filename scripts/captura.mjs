@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { iniciar } from '../src/arranque.js';
 
 const salida = path.resolve(process.argv[2] ?? 'capturas'); fs.mkdirSync(salida, { recursive: true });
@@ -50,4 +50,4 @@ for (const [i, v] of vistas.entries()) {
   const nombre = `${String(i + 1).padStart(2, '0')}-${v.normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase()}.png`;
   fs.writeFileSync(path.join(salida, nombre), Buffer.from(r.data, 'base64')); console.log('captura', nombre);
 }
-ws.close(); proc.kill(); await app.cerrar(); process.exit(0);
+ws.close(); try { execFileSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' }); } catch { proc.kill(); } await app.cerrar(); process.exit(0);

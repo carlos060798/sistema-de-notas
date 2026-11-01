@@ -61,6 +61,15 @@ export function crearMateria(db, nombre) {
   const r = db.prepare('insert into materia(nombre) values (?)').run(n);
   return { id: num(r.lastInsertRowid), nombre: n };
 }
+/** @param {Db} db @param {number} id @param {string} nombre */
+export function renombrarMateria(db, id, nombre) {
+  const n = textoObligatorio(nombre, 'Escriba el nombre de la materia');
+  if (n.length > 80) throw new ErrorValidacion('El nombre de la materia es demasiado largo (máximo 80 letras)');
+  if (!uno(db, 'select 1 x from materia where id = ?', id)) throw new ErrorValidacion('La materia no existe');
+  if (uno(db, 'select 1 x from materia where nombre = ? and id <> ?', n, id)) throw new ErrorValidacion('Ya existe otra materia con ese nombre');
+  db.prepare('update materia set nombre = ? where id = ?').run(n, id);
+  return { id, nombre: n };
+}
 /** @param {Db} db @returns {{ id: number, nombre: string }[]} */
 export const listarMaterias = (db) => todos(db, 'select id, nombre from materia').sort((a, b) => es.compare(a.nombre, b.nombre));
 

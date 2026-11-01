@@ -22,3 +22,4 @@
 2026-11-01T01:10:32Z | F6 | aviso | empaquetado OK local (exe 96MB, 77MB RAM, humo OK); CI sin ejecutar; revision independiente pendiente
 2026-11-01T01:16:11Z | F6 | ok | institucion, plan/guia a Word y PDF, UI probada en Edge; 111 pruebas; exe reconstruido OK
 2026-11-01T01:34:52Z | UI | ok | rediseno de interfaz (Hoy, menu lateral, respaldo visible), revision del agente product-designer aplicada; 114 pruebas
+2026-11-01T01:44:14Z | F4-6 | ok | adjuntos en guias (en la base, no en Excel), renombrar materias, nota invalida en casilla, apariencia, Nivelacion probada en Edge; arreglada fuga de procesos Edge en pruebas; 120 pruebas

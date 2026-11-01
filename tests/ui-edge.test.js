@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { iniciar } from '../src/arranque.js';
 
 const pf = process.env['ProgramFiles'] ?? 'C:\\Program Files'; const pf86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
@@ -16,6 +16,10 @@ const omitir = !navegador ? 'no hay Edge ni Chrome en este equipo' : process.env
 /** @type {Array<() => any>} */ const limpiar = [];
 after(async () => { for (const l of limpiar.reverse()) { try { await l(); } catch { /* ya cerrado */ } } });
 
+/** Cierra el navegador y todos sus procesos hijos (en Windows `kill()` solo cierra el principal). */
+const cerrarNavegador = (/** @type {import('node:child_process').ChildProcess} */ p) => {
+  if (process.platform === 'win32' && p.pid) { try { execFileSync('taskkill', ['/PID', String(p.pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* ya cerrado */ } } else p.kill();
+};
 const dormir = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
 test('pantalla de notas en un navegador real: escribir con coma, rechazar inválidas, marcar no aprobado', { skip: omitir, timeout: 90_000 }, async () => {
@@ -30,7 +34,7 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
 
   const perfil = path.join(dir, 'perfil');
   const proc = spawn(/** @type {string} */ (navegador), ['--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=0', `--user-data-dir=${perfil}`, 'about:blank'], { stdio: 'ignore' });
-  limpiar.push(() => proc.kill());
+  limpiar.push(() => cerrarNavegador(proc));
   let puerto = 0;
   for (let i = 0; i < 60 && !puerto; i++) { await dormir(500); try { puerto = Number(fs.readFileSync(path.join(perfil, 'DevToolsActivePort'), 'utf8').split('\n')[0]); } catch { /* aún no */ } }
   assert.ok(puerto, 'el navegador no abrió el puerto de depuración');
@@ -67,6 +71,7 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
 
   await escribir(1, 0, '6,5');
   await hasta(`document.getElementById('aviso').textContent`, 'La nota debe estar entre 1,0 y 5,0');
+  assert.equal(await ev(`document.querySelectorAll('tbody tr')[1].querySelectorAll('input.nota')[0].classList.contains('invalida')`), true); // la casilla queda marcada
   await escribir(1, 0, 'abc');
   await hasta(`document.getElementById('aviso').textContent`, 'Escriba solo números, por ejemplo 4,5');
 
@@ -115,5 +120,19 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   await ev(`document.querySelectorAll('tbody tr')[0].querySelectorAll('input.nota')[1].focus()`);
   await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))`);
   assert.equal(await ev(`document.activeElement === document.querySelectorAll('tbody tr')[1].querySelectorAll('input.nota')[1]`), true);
+
+  // Nivelación: Beto pierde el año (2,0 en los otros tres periodos) y se le registra la nota de nivelación
+  const beto = (await (await fetch(`${app.url}/api/estudiantes?anio_id=${anio.id}`, { headers: { 'x-token': app.token } })).json()).find((/** @type {any} */ x) => x.nombre === 'Beto Pérez');
+  for (const per of [2, 3, 4]) await post('/api/notas', { matricula_id: beto.matricula_id, materia_id: mat.id, periodo: per, n1: 2, n2: 2, n3: 2 }, 'PUT');
+  await menu('Nivelación');
+  await hasta(`document.body.textContent.includes('Beto Pérez')`, true);
+  await ev(`(() => { const t = document.querySelector('section.tarjeta input.nota'); t.value = '3,4'; [...document.querySelectorAll('button')].find((b) => b.textContent === 'Guardar').click(); })()`);
+  await hasta(`document.getElementById('aviso').textContent`, 'Nivelación registrada');
+  assert.deepEqual(await (await fetch(`${app.url}/api/nivelaciones/pendientes?anio_id=${anio.id}`, { headers: { 'x-token': app.token } })).json(), []);
+  // Apariencia: el botón cambia entre automática, clara y oscura
+  await ev(`document.getElementById('apariencia').click()`);
+  assert.equal(await ev(`document.documentElement.getAttribute('data-theme')`), 'light');
+  await ev(`document.getElementById('apariencia').click()`);
+  assert.equal(await ev(`document.documentElement.getAttribute('data-theme')`), 'dark');
   assert.deepEqual(errores, []);
 });

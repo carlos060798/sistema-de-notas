@@ -98,6 +98,15 @@ const MIGRACIONES = [
     realizada integer not null default 0 check (realizada in (0,1))
   );
   `,
+  `
+  create table guia_adjunto (
+    id integer primary key,
+    guia_id integer not null references guia(id),
+    nombre text not null,
+    tamano integer not null,
+    datos blob not null
+  );
+  `,
 ];
 
 export const VERSION_ESQUEMA = MIGRACIONES.length;

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { abrirBase, VERSION_ESQUEMA } from '../datos/base.js';
 import {
   ErrorValidacion, crearAnio, cerrarAnio, listarAnios, crearMateria, listarMaterias,
-  crearEstudiante, editarEstudiante, archivarEstudiante, listarEstudiantes,
+  crearEstudiante, editarEstudiante, renombrarMateria, archivarEstudiante, listarEstudiantes,
   guardarNotas, listarNotas, desaprobadas, guardarNivelacion, pendientesNivelacion,
 } from '../servicios/academico.js';
 import { resumen, registrarExcelDescargado } from '../servicios/resumen.js';
@@ -122,6 +122,7 @@ export function crearServidor(opciones) {
     { metodo: 'GET', patron: /^\/api\/resumen$/, cuerpo: null, h: ({ q }) => ({ json: resumen(bd(), { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), copias: ctx.carpetaCopias ? listarCopias(ctx.carpetaCopias) : [] }) }) },
     { metodo: 'GET', patron: /^\/api\/institucion$/, cuerpo: null, h: () => ({ json: encabezado(bd()) }) },
     { metodo: 'PUT', patron: /^\/api\/institucion$/, cuerpo: 'json', h: ({ b }) => { guardarInstitucion(bd(), b ?? {}); return { json: encabezado(bd()) }; } },
+    { metodo: 'PUT', patron: /^\/api\/materias\/(\d+)$/, cuerpo: 'json', h: ({ p, b }) => ({ json: renombrarMateria(bd(), Number(p[0]), b?.nombre) }) },
     { metodo: 'POST', patron: /^\/api\/materias$/, cuerpo: 'json', h: ({ b }) => ({ json: crearMateria(bd(), b?.nombre) }) },
 
     { metodo: 'GET', patron: /^\/api\/estudiantes$/, cuerpo: null, h: ({ q }) => ({
@@ -150,6 +151,9 @@ export function crearServidor(opciones) {
     { metodo: 'DELETE', patron: /^\/api\/planes\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarPlan(bd(), Number(p[0])); return { json: { ok: true } }; } },
     { metodo: 'GET', patron: /^\/api\/guias$/, cuerpo: null, h: ({ q }) => ({ json: PL.listarGuias(bd(), { materia_id: entero(q.get('materia_id'), 'materia_id'), grado: entero(q.get('grado'), 'grado'), tema: q.get('tema') ?? undefined }) }) },
     { metodo: 'PUT', patron: /^\/api\/guias$/, cuerpo: 'json', h: ({ b }) => ({ json: PL.guardarGuia(bd(), b ?? {}) }) },
+    { metodo: 'POST', patron: /^\/api\/guias\/(\d+)\/adjuntos$/, cuerpo: 'raw', h: ({ p, q, b }) => ({ json: PL.agregarAdjunto(bd(), { guia_id: Number(p[0]), nombre: q.get('nombre') ?? '', datos: b }) }) },
+    { metodo: 'GET', patron: /^\/api\/adjuntos\/(\d+)$/, cuerpo: null, h: ({ p }) => { const a = PL.leerAdjunto(bd(), Number(p[0])); return { raw: a.datos, headers: { 'content-type': a.tipo, 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.nombre)}` } }; } },
+    { metodo: 'DELETE', patron: /^\/api\/adjuntos\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarAdjunto(bd(), Number(p[0])); return { json: { ok: true } }; } },
     { metodo: 'DELETE', patron: /^\/api\/guias\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarGuia(bd(), Number(p[0])); return { json: { ok: true } }; } },
     { metodo: 'GET', patron: /^\/api\/temas$/, cuerpo: null, h: ({ q }) => {
       const f = { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), materia_id: entero(q.get('materia_id'), 'materia_id'), grado: entero(q.get('grado'), 'grado') };

@@ -80,14 +80,16 @@ export function guardarGuia(db, d) {
 /** @param {Db} db @param {{ materia_id?: number, grado?: number, tema?: string }} q */
 export const listarGuias = (db, q) => {
   const patron = q.tema ? `%${q.tema.replace(/[\\%_]/g, '\\$&')}%` : null;
-  return todos(db,
+  const guias = todos(db,
     `select g.id, g.materia_id, m.nombre materia, g.grado_id grado, g.tema, g.titulo, g.contenido from guia g join materia m on m.id = g.materia_id
      where (? is null or g.materia_id = ?) and (? is null or g.grado_id = ?) and (? is null or g.tema like ? escape '\\') order by g.grado_id, m.nombre, g.tema, g.titulo`,
     q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null, patron, patron);
+  return guias.map((g) => ({ ...g, adjuntos: todos(db, 'select id, nombre, tamano from guia_adjunto where guia_id = ? order by id', g.id) }));
 };
 /** @param {Db} db @param {number} guiaId */
 export function borrarGuia(db, guiaId) {
   if (!uno(db, 'select 1 x from guia where id = ?', guiaId)) throw new ErrorValidacion('La guía no existe');
+  db.prepare('delete from guia_adjunto where guia_id = ?').run(guiaId);
   db.prepare('delete from guia where id = ?').run(guiaId);
 }
 
@@ -170,4 +172,44 @@ export function borrarClase(db, claseId) {
   if (!c) throw new ErrorValidacion('La clase no existe');
   exigirAnioAbierto(db, c.anio_id);
   db.prepare('delete from clase where id = ?').run(claseId);
+}
+
+// --- Adjuntos de guías --------------------------------------------------------------------------
+
+export const TAMANO_MAXIMO_ADJUNTO = 15_000_000;
+/** Tipos permitidos (por extensión) y su tipo de contenido al descargarlos. */
+export const TIPOS_ADJUNTO = /** @type {Record<string, string>} */ ({
+  pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', txt: 'text/plain; charset=utf-8',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+});
+
+/** Solo el nombre del archivo, sin carpetas ni caracteres de control. @param {string} nombre */
+function nombreSeguro(nombre) {
+  return String(nombre ?? '').split(/[\\/]/).pop()?.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 120) ?? '';
+}
+
+/** @param {Db} db @param {{ guia_id: number, nombre: string, datos: Buffer }} d */
+export function agregarAdjunto(db, d) {
+  if (!uno(db, 'select 1 x from guia where id = ?', d.guia_id)) throw new ErrorValidacion('La guía no existe');
+  const nombre = nombreSeguro(d.nombre);
+  if (!nombre) throw new ErrorValidacion('El archivo no tiene nombre');
+  const ext = nombre.includes('.') ? /** @type {string} */ (nombre.split('.').pop()).toLowerCase() : '';
+  if (!(ext in TIPOS_ADJUNTO)) throw new ErrorValidacion('Solo se aceptan archivos PDF, Word, Excel, PowerPoint, imágenes (png, jpg) y texto (txt)');
+  if (d.datos.length === 0) throw new ErrorValidacion('El archivo está vacío');
+  if (d.datos.length > TAMANO_MAXIMO_ADJUNTO) throw new ErrorValidacion('El archivo es demasiado grande (máximo 15 MB)');
+  return { id: id(db.prepare('insert into guia_adjunto(guia_id, nombre, tamano, datos) values (?,?,?,?)').run(d.guia_id, nombre, d.datos.length, d.datos)), nombre };
+}
+/** @param {Db} db @param {number} adjuntoId */
+export function leerAdjunto(db, adjuntoId) {
+  const f = uno(db, 'select nombre, datos from guia_adjunto where id = ?', adjuntoId);
+  if (!f) throw new ErrorValidacion('El archivo adjunto no existe');
+  const ext = /** @type {string} */ (String(f.nombre).split('.').pop()).toLowerCase();
+  return { nombre: String(f.nombre), tipo: TIPOS_ADJUNTO[ext] ?? 'application/octet-stream', datos: Buffer.from(f.datos) };
+}
+/** @param {Db} db @param {number} adjuntoId */
+export function borrarAdjunto(db, adjuntoId) {
+  if (!uno(db, 'select 1 x from guia_adjunto where id = ?', adjuntoId)) throw new ErrorValidacion('El archivo adjunto no existe');
+  db.prepare('delete from guia_adjunto where id = ?').run(adjuntoId);
 }

@@ -28,7 +28,7 @@
 
 ## F4 Planes, guías y avance
 - [x] **T4.1** Plan de área y plan de aula. Cubre CA-004-01 a 03.
-- [~] **T4.2** Guías con adjuntos en `datos/`. Cubre CA-005-01, 02, RF-005. (parcial: guías como texto, sin adjuntos; a validar con el docente)
+- [x] **T4.2** Guías con adjuntos. Cubre CA-005-01, 02, RF-005. (Los adjuntos viven dentro de la base: entran en cada copia de seguridad; NO entran en el Excel, que no guarda archivos. Máximo 15 MB por archivo.)
 - [x] **T4.3** Temas, avance y clases. Cubre CA-006-01 a 04.
 
 ## F5 Reportes

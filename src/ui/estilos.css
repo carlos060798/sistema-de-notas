@@ -5,11 +5,15 @@
   --lateral: #14372b; --lateral-texto: #e8f3ed; --sombra: 0 1px 2px rgba(20, 40, 30, .08); --borde-campo: #7a8a82; --activo-fondo: #ffffff; --activo-texto: #14372b;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --fondo: #101714; --papel: #1a2420; --texto: #e6efe9; --suave: #a8b8af; --linea: #33423b;
+  :root:not([data-theme="light"]) { --fondo: #101714; --papel: #1a2420; --texto: #e6efe9; --suave: #a8b8af; --linea: #33423b;
           --marca: #5cc596; --marca-fuerte: #7ad8b0; --marca-texto: #08140f; --marca-suave: #1d3a2e;
           --bien: #62c58e; --mal: #ff8a7d; --mal-fondo: #3a1f1c; --alerta: #f2c260; --alerta-fondo: #3b3217; --aviso-fondo: #3b3217;
           --lateral: #0a120f; --lateral-texto: #d7e6dd; --sombra: none; --borde-campo: #6f8279; --activo-fondo: var(--marca); --activo-texto: var(--marca-texto); }
 }
+:root[data-theme="dark"] { --fondo: #101714; --papel: #1a2420; --texto: #e6efe9; --suave: #a8b8af; --linea: #33423b;
+          --marca: #5cc596; --marca-fuerte: #7ad8b0; --marca-texto: #08140f; --marca-suave: #1d3a2e;
+          --bien: #62c58e; --mal: #ff8a7d; --mal-fondo: #3a1f1c; --alerta: #f2c260; --alerta-fondo: #3b3217; --aviso-fondo: #3b3217;
+          --lateral: #0a120f; --lateral-texto: #d7e6dd; --sombra: none; --borde-campo: #6f8279; --activo-fondo: var(--marca); --activo-texto: var(--marca-texto); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--fondo); color: var(--texto); font: 18px/1.5 system-ui, "Segoe UI", sans-serif; }
 
@@ -43,10 +47,11 @@ button.peligro { background: transparent; border: 1px solid var(--mal); color: v
 .pestanas button { background: transparent; border: 1px solid var(--linea); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 .pestanas button[aria-current="true"] { background: var(--marca); color: var(--marca-texto); border-color: var(--marca); font-weight: 700; }
 
-table { width: 100%; border-collapse: collapse; background: var(--papel); }
+table { font-variant-numeric: tabular-nums; width: 100%; border-collapse: collapse; background: var(--papel); }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
 th { font-size: .95rem; color: var(--suave); font-weight: 600; }
 td input.nota { width: 5.5em; text-align: center; }
+td input.nota.invalida { border: 2px solid var(--mal); background: var(--mal-fondo); }
 td input.nota.vacia { background: var(--alerta-fondo); border-color: var(--alerta); }
 tr.reprobado td { background: var(--mal-fondo); }
 .etiqueta, .sin-partir { white-space: nowrap; }
@@ -97,3 +102,7 @@ details.menu-doc .menu-lista button:hover { background: var(--marca-suave); }
   main { padding: 14px; }
   td input.nota { width: 4.5em; }
 }
+
+.apariencia { margin: 18px 8px 0; background: transparent; color: var(--lateral-texto); border: 1px solid rgba(255, 255, 255, .35); border-radius: 10px; padding: 8px 12px; font: inherit; font-size: .95rem; cursor: pointer; text-align: left; }
+.apariencia:hover { background: rgba(255, 255, 255, .08); }
+.apariencia:focus-visible { outline: 3px solid #fff; outline-offset: 1px; }

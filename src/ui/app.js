@@ -14,6 +14,14 @@ const sel = { anio: null, grado: 0, materia: null, periodo: 1 };
 let vista = 'inicio';
 // El año, grado, materia y periodo elegidos se recuerdan entre pantallas y al volver a abrir el programa.
 try { Object.assign(sel, JSON.parse(localStorage.getItem('notas.sel') ?? '{}')); } catch { /* sin almacenamiento: se usan los valores iniciales */ }
+const APARIENCIAS = [['auto', 'Apariencia: automática'], ['light', 'Apariencia: clara'], ['dark', 'Apariencia: oscura']];
+function aplicarApariencia(valor) {
+  if (valor === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', valor);
+  const boton = document.getElementById('apariencia'); if (boton) boton.textContent = APARIENCIAS.find(([v]) => v === valor)[1];
+}
+let apariencia = 'auto';
+try { apariencia = localStorage.getItem('notas.apariencia') ?? 'auto'; } catch { /* sin almacenamiento */ }
+if (!APARIENCIAS.some(([v]) => v === apariencia)) apariencia = 'auto';
 const guardarSel = () => { try { localStorage.setItem('notas.sel', JSON.stringify(sel)); } catch { /* no es grave */ } };
 
 
@@ -164,7 +172,10 @@ function filaNotas(f, alCambiarResumen) {
   const guardarAhora = async () => {
     const textos = entradas.map((e) => e.value);
     const valores = textos.map((t) => leerNota(t));
+    const mala = valores.map((v) => v !== null && (Number.isNaN(v) || v < 1 || v > 5));
+    entradas.forEach((e, i) => { e.classList.toggle('invalida', mala[i]); e.setAttribute('aria-invalid', String(mala[i])); });
     if (valores.some((v) => Number.isNaN(v))) { aviso('Escriba solo números, por ejemplo 4,5', true); return; }
+    if (mala.some(Boolean)) { aviso('La nota debe estar entre 1,0 y 5,0', true); return; }
     await intentar(async () => {
       const r = await json('PUT', '/api/notas', { matricula_id: f.matricula_id, materia_id: sel.materia, periodo: sel.periodo, n1: valores[0], n2: valores[1], n3: valores[2] });
       f.n1 = valores[0]; f.n2 = valores[1]; f.n3 = valores[2]; f.definitiva = r.definitiva; f.aprobado = r.aprobado;
@@ -378,7 +389,8 @@ async function pantallaConfig(cont) {
     h('section', { class: 'tarjeta' }, h('h2', {}, 'Materias'),
       h('form', { onsubmit: (e) => { e.preventDefault(); intentar(async () => { await json('POST', '/api/materias', { nombre: mat.value }); aviso('Materia creada'); mostrar(); }); } },
         h('label', {}, 'Nombre de la materia', mat), h('button', { class: 'principal', type: 'submit' }, 'Agregar materia')),
-      estado.materias.length ? h('ul', { class: 'sin-vinetas' }, estado.materias.map((m) => h('li', {}, m.nombre))) : h('p', { class: 'vacio' }, 'Aún no hay materias.')));
+      estado.materias.length ? h('ul', { class: 'sin-vinetas' }, estado.materias.map((m) => h('li', {}, h('span', {}, m.nombre),
+        h('button', { class: 'secundario', onclick: () => { const nuevo = prompt('Nuevo nombre de la materia', m.nombre); if (nuevo !== null && nuevo.trim() !== m.nombre) intentar(async () => { await json('PUT', `/api/materias/${m.id}`, { nombre: nuevo }); aviso('Materia renombrada'); mostrar(); }); } }, 'Cambiar nombre')))) : h('p', { class: 'vacio' }, 'Aún no hay materias.')));
 }
 
 // --- Recuperación -------------------------------------------------------------------------------
@@ -487,6 +499,16 @@ async function seccionPlanes(filtro) {
         h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar')))));
 }
 
+/** Selector de archivo y botón para adjuntar a una guía. */
+function adjuntador(g) {
+  const archivo = h('input', { type: 'file', accept: '.pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.txt', 'aria-label': `Archivo para adjuntar a ${g.titulo}` });
+  return h('div', { class: 'fila-acciones' }, archivo, h('button', { class: 'secundario', onclick: () => {
+    const f = archivo.files[0]; if (!f) return aviso('Elija primero un archivo', true);
+    if (f.size > 15_000_000) return aviso('El archivo es demasiado grande (máximo 15 MB)', true);
+    intentar(async () => { await api('POST', `/api/guias/${g.id}/adjuntos?nombre=${encodeURIComponent(f.name)}`, undefined, await f.arrayBuffer()); aviso('Archivo adjuntado'); mostrar(); });
+  } }, 'Adjuntar archivo'));
+}
+
 async function seccionGuias() {
   const guias = await json('GET', `/api/guias?materia_id=${sel.materia}&grado=${sel.grado}`);
   const e = edicionGuia && guias.find((g) => g.id === edicionGuia);
@@ -502,6 +524,12 @@ async function seccionGuias() {
       e ? h('button', { class: 'secundario', onclick: () => { edicionGuia = null; mostrar(); } }, 'Cancelar') : null),
     ...guias.map((g) => h('details', {}, h('summary', {}, `${g.tema ? g.tema + ' — ' : ''}${g.titulo}`),
       h('pre', { class: 'texto' }, g.contenido),
+      g.adjuntos.length ? h('ul', { class: 'sin-vinetas' }, g.adjuntos.map((ad) => h('li', {},
+        h('span', {}, `${ad.nombre} (${Math.max(1, Math.round(ad.tamano / 1024))} KB)`),
+        h('span', { class: 'fila-acciones' },
+          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/adjuntos/${ad.id}`) }, 'Descargar'),
+          h('button', { class: 'peligro', onclick: () => { if (confirm(`¿Quitar el archivo «${ad.nombre}»?`)) intentar(async () => { await json('DELETE', `/api/adjuntos/${ad.id}`); mostrar(); }); } }, 'Quitar'))))) : null,
+      adjuntador(g),
       h('div', { class: 'fila-acciones' },
         h('button', { class: 'secundario', onclick: () => { edicionGuia = g.id; mostrar(); } }, 'Editar'),
         h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/guia?id=${g.id}&formato=docx`) }, 'Word'),
@@ -552,5 +580,14 @@ async function pantallaInicio(cont) {
 const hashInicial = location.hash.slice(1);
 if (VISTAS.some(([id]) => id === hashInicial)) vista = hashInicial;
 
+{
+  const boton = document.getElementById('apariencia');
+  aplicarApariencia(apariencia);
+  boton.addEventListener('click', () => {
+    apariencia = APARIENCIAS[(APARIENCIAS.findIndex(([v]) => v === apariencia) + 1) % APARIENCIAS.length][0];
+    try { localStorage.setItem('notas.apariencia', apariencia); } catch { /* no es grave */ }
+    aplicarApariencia(apariencia);
+  });
+}
 setInterval(() => { fetch('/api/latido', { method: 'POST', headers: { 'x-token': TOKEN } }).catch(() => {}); }, 5000);
 mostrar();
