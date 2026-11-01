@@ -78,4 +78,13 @@ test('pantalla de notas en un navegador real: escribir con coma, rechazar invál
   // El dato quedó guardado en la base, no solo en pantalla
   const filas = await (await fetch(`${app.url}/api/notas?anio_id=${anio.id}&grado=0&materia_id=${mat.id}&periodo=1`, { headers: { 'x-token': app.token } })).json();
   assert.deepEqual(filas.map((/** @type {any} */ f) => f.definitiva.valor), [4.0, 2.5]);
+
+  // Planeación: agregar un tema, marcarlo como visto y ver el avance
+  await ev(`[...document.querySelectorAll('#menu button')].find((b) => b.textContent === 'Planeación').click()`);
+  await hasta(`document.querySelectorAll('h3').length > 0 && document.querySelector('h3').textContent`, 'Avance: 0 de 0 temas vistos (0 %)');
+  await ev(`(() => { const i = document.querySelector('input[type=text]'); i.value = 'Las sumas'; document.querySelector('button.principal').click(); })()`);
+  await hasta(`document.querySelectorAll('tbody tr').length`, 1);
+  await ev(`(() => { const s = document.querySelector('tbody select'); s.value = 'visto'; s.dispatchEvent(new Event('change')); })()`);
+  await hasta(`document.querySelector('h3').textContent`, 'Avance: 1 de 1 temas vistos (100 %)');
+  assert.deepEqual(errores, []);
 });

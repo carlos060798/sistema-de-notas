@@ -21,7 +21,7 @@ const todos = (db, sql, ...args) => /** @type {any[]} */ (db.prepare(sql).all(..
 const uno = (db, sql, ...args) => db.prepare(sql).get(...args);
 
 /** @param {unknown} v @param {string} msg */
-function textoObligatorio(v, msg) {
+export function textoObligatorio(v, msg) {
   const t = typeof v === 'string' ? v.trim() : '';
   if (!t) throw new ErrorValidacion(msg);
   return t;
@@ -45,7 +45,7 @@ export function cerrarAnio(db, id) {
   db.prepare('update anio_lectivo set cerrado = 1 where id = ?').run(id);
 }
 /** @param {Db} db @param {number} anioId */
-function exigirAnioAbierto(db, anioId) {
+export function exigirAnioAbierto(db, anioId) {
   const a = f(uno(db, 'select anio, cerrado from anio_lectivo where id = ?', anioId));
   if (!a) throw new ErrorValidacion('El año lectivo no existe');
   if (a.cerrado) throw new ErrorValidacion(`El año ${a.anio} está cerrado: solo se puede consultar`);
@@ -67,7 +67,7 @@ export const listarMaterias = (db) => todos(db, 'select id, nombre from materia'
 // --- Estudiantes --------------------------------------------------------------------------------
 
 /** @param {unknown} g */
-function validarGrado(g) {
+export function validarGrado(g) {
   if (!Number.isInteger(g) || /** @type {number} */ (g) < 0 || /** @type {number} */ (g) > 5) throw new ErrorValidacion('El grado debe ser de 0 a 5');
 }
 

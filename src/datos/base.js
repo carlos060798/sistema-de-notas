@@ -57,6 +57,47 @@ const MIGRACIONES = [
     valor text not null
   );
   `,
+  `
+  create table plan (
+    id integer primary key,
+    tipo text not null check (tipo in ('area','aula')),
+    anio_id integer not null references anio_lectivo(id),
+    materia_id integer not null references materia(id),
+    grado_id integer not null references grado(id),
+    titulo text not null,
+    contenido text not null default ''
+  );
+  create table guia (
+    id integer primary key,
+    materia_id integer not null references materia(id),
+    grado_id integer not null references grado(id),
+    tema text not null default '',
+    titulo text not null,
+    contenido text not null default ''
+  );
+  create table tema (
+    id integer primary key,
+    anio_id integer not null references anio_lectivo(id),
+    materia_id integer not null references materia(id),
+    grado_id integer not null references grado(id),
+    periodo integer not null check (periodo between 1 and 4),
+    nombre text not null,
+    estado text not null default 'pendiente' check (estado in ('pendiente','en_curso','visto')),
+    fecha_visto text
+  );
+  create table clase (
+    id integer primary key,
+    anio_id integer not null references anio_lectivo(id),
+    materia_id integer not null references materia(id),
+    grado_id integer not null references grado(id),
+    fecha text not null,
+    tema_id integer references tema(id),
+    objetivo text not null default '',
+    actividades text not null default '',
+    recursos text not null default '',
+    realizada integer not null default 0 check (realizada in (0,1))
+  );
+  `,
 ];
 
 export const VERSION_ESQUEMA = MIGRACIONES.length;

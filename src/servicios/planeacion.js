@@ -1,0 +1,173 @@
+// @ts-check
+// Planeación del docente: planes de área y de aula, guías, temas con avance y clases planeadas.
+import { ErrorValidacion, exigirAnioAbierto, validarGrado, textoObligatorio } from './academico.js';
+
+/** @typedef {import('node:sqlite').DatabaseSync} Db */
+/** @param {Db} db @param {string} sql @param {...any} args @returns {any[]} */
+const todos = (db, sql, ...args) => /** @type {any[]} */ (db.prepare(sql).all(...args));
+/** @param {Db} db @param {string} sql @param {...any} args @returns {any} */
+const uno = (db, sql, ...args) => db.prepare(sql).get(...args);
+
+/** @param {Db} db @param {unknown} id */
+function exigirMateria(db, id) {
+  if (!uno(db, 'select 1 x from materia where id = ?', id)) throw new ErrorValidacion('La materia no existe');
+}
+/** @param {unknown} v @param {string} msg @param {number} max */
+function texto(v, msg, max) {
+  const t = textoObligatorio(v, msg);
+  if (t.length > max) throw new ErrorValidacion(`${msg.replace(/^Escriba /, 'Es demasiado largo: ')} (máximo ${max} letras)`);
+  return t;
+}
+/** Texto libre opcional (contenido largo). @param {unknown} v @param {string} nombre */
+function libre(v, nombre) {
+  const t = typeof v === 'string' ? v : '';
+  if (t.length > 100_000) throw new ErrorValidacion(`${nombre} es demasiado largo`);
+  return t;
+}
+/** @param {unknown} periodo */
+function validarPeriodo(periodo) {
+  if (!Number.isInteger(periodo) || /** @type {number} */ (periodo) < 1 || /** @type {number} */ (periodo) > 4) throw new ErrorValidacion('El periodo debe ser 1, 2, 3 o 4');
+}
+/** Fecha AAAA-MM-DD real. @param {unknown} v */
+function validarFecha(v) {
+  const m = typeof v === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(v) : null;
+  const d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+  if (!m || !d || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) throw new ErrorValidacion('Escriba una fecha válida con el formato AAAA-MM-DD');
+  return /** @type {string} */ (v);
+}
+const id = (/** @type {any} */ r) => Number(r.lastInsertRowid);
+
+// --- Planes -------------------------------------------------------------------------------------
+
+/** @param {Db} db @param {{ id?: number, tipo: string, anio_id: number, materia_id: number, grado: number, titulo: string, contenido?: string }} d */
+export function guardarPlan(db, d) {
+  if (d.tipo !== 'area' && d.tipo !== 'aula') throw new ErrorValidacion('El tipo de plan debe ser «area» o «aula»');
+  exigirAnioAbierto(db, d.anio_id); exigirMateria(db, d.materia_id); validarGrado(d.grado);
+  const titulo = texto(d.titulo, 'Escriba el título del plan', 150); const contenido = libre(d.contenido, 'El contenido');
+  if (d.id) {
+    if (!uno(db, 'select 1 x from plan where id = ?', d.id)) throw new ErrorValidacion('El plan no existe');
+    db.prepare('update plan set tipo=?, anio_id=?, materia_id=?, grado_id=?, titulo=?, contenido=? where id=?').run(d.tipo, d.anio_id, d.materia_id, d.grado, titulo, contenido, d.id);
+    return { id: d.id };
+  }
+  return { id: id(db.prepare('insert into plan(tipo, anio_id, materia_id, grado_id, titulo, contenido) values (?,?,?,?,?,?)').run(d.tipo, d.anio_id, d.materia_id, d.grado, titulo, contenido)) };
+}
+/** @param {Db} db @param {{ anio_id: number, tipo?: string, materia_id?: number, grado?: number }} q */
+export const listarPlanes = (db, q) => todos(db,
+  `select p.id, p.tipo, p.anio_id, p.materia_id, m.nombre materia, p.grado_id grado, p.titulo, p.contenido from plan p join materia m on m.id = p.materia_id
+   where p.anio_id = ? and (? is null or p.tipo = ?) and (? is null or p.materia_id = ?) and (? is null or p.grado_id = ?) order by p.grado_id, m.nombre, p.titulo`,
+  q.anio_id, q.tipo ?? null, q.tipo ?? null, q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null);
+/** @param {Db} db @param {number} planId */
+export function borrarPlan(db, planId) {
+  const p = uno(db, 'select anio_id from plan where id = ?', planId);
+  if (!p) throw new ErrorValidacion('El plan no existe');
+  exigirAnioAbierto(db, p.anio_id);
+  db.prepare('delete from plan where id = ?').run(planId);
+}
+
+// --- Guías (no dependen del año: se reutilizan) -------------------------------------------------
+
+/** @param {Db} db @param {{ id?: number, materia_id: number, grado: number, tema?: string, titulo: string, contenido?: string }} d */
+export function guardarGuia(db, d) {
+  exigirMateria(db, d.materia_id); validarGrado(d.grado);
+  const titulo = texto(d.titulo, 'Escriba el título de la guía', 150); const tema = (d.tema ?? '').trim().slice(0, 150); const contenido = libre(d.contenido, 'El contenido');
+  if (d.id) {
+    if (!uno(db, 'select 1 x from guia where id = ?', d.id)) throw new ErrorValidacion('La guía no existe');
+    db.prepare('update guia set materia_id=?, grado_id=?, tema=?, titulo=?, contenido=? where id=?').run(d.materia_id, d.grado, tema, titulo, contenido, d.id);
+    return { id: d.id };
+  }
+  return { id: id(db.prepare('insert into guia(materia_id, grado_id, tema, titulo, contenido) values (?,?,?,?,?)').run(d.materia_id, d.grado, tema, titulo, contenido)) };
+}
+/** @param {Db} db @param {{ materia_id?: number, grado?: number, tema?: string }} q */
+export const listarGuias = (db, q) => {
+  const patron = q.tema ? `%${q.tema.replace(/[\\%_]/g, '\\$&')}%` : null;
+  return todos(db,
+    `select g.id, g.materia_id, m.nombre materia, g.grado_id grado, g.tema, g.titulo, g.contenido from guia g join materia m on m.id = g.materia_id
+     where (? is null or g.materia_id = ?) and (? is null or g.grado_id = ?) and (? is null or g.tema like ? escape '\\') order by g.grado_id, m.nombre, g.tema, g.titulo`,
+    q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null, patron, patron);
+};
+/** @param {Db} db @param {number} guiaId */
+export function borrarGuia(db, guiaId) {
+  if (!uno(db, 'select 1 x from guia where id = ?', guiaId)) throw new ErrorValidacion('La guía no existe');
+  db.prepare('delete from guia where id = ?').run(guiaId);
+}
+
+// --- Temas y avance -----------------------------------------------------------------------------
+
+const ESTADOS = ['pendiente', 'en_curso', 'visto'];
+
+/** @param {Db} db @param {{ id?: number, anio_id: number, materia_id: number, grado: number, periodo: number, nombre: string }} d */
+export function guardarTema(db, d) {
+  exigirAnioAbierto(db, d.anio_id); exigirMateria(db, d.materia_id); validarGrado(d.grado); validarPeriodo(d.periodo);
+  const nombre = texto(d.nombre, 'Escriba el nombre del tema', 150);
+  if (d.id) {
+    if (!uno(db, 'select 1 x from tema where id = ?', d.id)) throw new ErrorValidacion('El tema no existe');
+    db.prepare('update tema set materia_id=?, grado_id=?, periodo=?, nombre=? where id=?').run(d.materia_id, d.grado, d.periodo, nombre, d.id);
+    return { id: d.id };
+  }
+  return { id: id(db.prepare('insert into tema(anio_id, materia_id, grado_id, periodo, nombre) values (?,?,?,?,?)').run(d.anio_id, d.materia_id, d.grado, d.periodo, nombre)) };
+}
+/** @param {Db} db @param {number} temaId @param {string} estado @param {string} [fecha] */
+export function cambiarEstadoTema(db, temaId, estado, fecha) {
+  if (!ESTADOS.includes(estado)) throw new ErrorValidacion('El estado debe ser pendiente, en curso o visto');
+  const t = uno(db, 'select anio_id from tema where id = ?', temaId);
+  if (!t) throw new ErrorValidacion('El tema no existe');
+  exigirAnioAbierto(db, t.anio_id);
+  const visto = estado === 'visto' ? validarFecha(fecha ?? new Date().toISOString().slice(0, 10)) : null;
+  db.prepare('update tema set estado = ?, fecha_visto = ? where id = ?').run(estado, visto, temaId);
+}
+/** @param {Db} db @param {{ anio_id: number, materia_id?: number, grado?: number, periodo?: number }} q */
+export const listarTemas = (db, q) => todos(db,
+  `select t.id, t.materia_id, m.nombre materia, t.grado_id grado, t.periodo, t.nombre, t.estado, t.fecha_visto from tema t join materia m on m.id = t.materia_id
+   where t.anio_id = ? and (? is null or t.materia_id = ?) and (? is null or t.grado_id = ?) and (? is null or t.periodo = ?) order by t.grado_id, m.nombre, t.periodo, t.id`,
+  q.anio_id, q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null, q.periodo ?? null, q.periodo ?? null);
+/** @param {Db} db @param {{ anio_id: number, materia_id?: number, grado?: number }} q */
+export function avanceTemas(db, q) {
+  const r = uno(db,
+    `select count(*) total, coalesce(sum(estado = 'visto'), 0) vistos from tema where anio_id = ? and (? is null or materia_id = ?) and (? is null or grado_id = ?)`,
+    q.anio_id, q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null);
+  const total = Number(r.total), vistos = Number(r.vistos);
+  return { total, vistos, porcentaje: total ? Math.round((vistos * 100) / total) : 0 };
+}
+/** @param {Db} db @param {number} temaId */
+export function borrarTema(db, temaId) {
+  const t = uno(db, 'select anio_id from tema where id = ?', temaId);
+  if (!t) throw new ErrorValidacion('El tema no existe');
+  exigirAnioAbierto(db, t.anio_id);
+  db.prepare('update clase set tema_id = null where tema_id = ?').run(temaId); // las clases se conservan
+  db.prepare('delete from tema where id = ?').run(temaId);
+}
+
+// --- Clases planeadas ---------------------------------------------------------------------------
+
+/** @param {Db} db @param {{ id?: number, anio_id: number, materia_id: number, grado: number, fecha: string, tema_id?: number | null, objetivo?: string, actividades?: string, recursos?: string }} d */
+export function guardarClase(db, d) {
+  exigirAnioAbierto(db, d.anio_id); exigirMateria(db, d.materia_id); validarGrado(d.grado);
+  const fecha = validarFecha(d.fecha);
+  if (d.tema_id != null && !uno(db, 'select 1 x from tema where id = ? and anio_id = ?', d.tema_id, d.anio_id)) throw new ErrorValidacion('El tema no existe en este año');
+  const campos = [libre(d.objetivo, 'El objetivo'), libre(d.actividades, 'Las actividades'), libre(d.recursos, 'Los recursos')];
+  if (d.id) {
+    if (!uno(db, 'select 1 x from clase where id = ?', d.id)) throw new ErrorValidacion('La clase no existe');
+    db.prepare('update clase set materia_id=?, grado_id=?, fecha=?, tema_id=?, objetivo=?, actividades=?, recursos=? where id=?').run(d.materia_id, d.grado, fecha, d.tema_id ?? null, ...campos, d.id);
+    return { id: d.id };
+  }
+  return { id: id(db.prepare('insert into clase(anio_id, materia_id, grado_id, fecha, tema_id, objetivo, actividades, recursos) values (?,?,?,?,?,?,?,?)').run(d.anio_id, d.materia_id, d.grado, fecha, d.tema_id ?? null, ...campos)) };
+}
+/** @param {Db} db @param {number} claseId @param {boolean} realizada */
+export function marcarClase(db, claseId, realizada) {
+  const c = uno(db, 'select anio_id from clase where id = ?', claseId);
+  if (!c) throw new ErrorValidacion('La clase no existe');
+  exigirAnioAbierto(db, c.anio_id);
+  db.prepare('update clase set realizada = ? where id = ?').run(realizada ? 1 : 0, claseId);
+}
+/** @param {Db} db @param {{ anio_id: number, materia_id?: number, grado?: number, desde?: string, hasta?: string }} q */
+export const listarClases = (db, q) => todos(db,
+  `select c.id, c.materia_id, m.nombre materia, c.grado_id grado, c.fecha, c.tema_id, c.objetivo, c.actividades, c.recursos, c.realizada from clase c join materia m on m.id = c.materia_id
+   where c.anio_id = ? and (? is null or c.materia_id = ?) and (? is null or c.grado_id = ?) and (? is null or c.fecha >= ?) and (? is null or c.fecha <= ?) order by c.fecha, c.id`,
+  q.anio_id, q.materia_id ?? null, q.materia_id ?? null, q.grado ?? null, q.grado ?? null, q.desde ?? null, q.desde ?? null, q.hasta ?? null, q.hasta ?? null);
+/** @param {Db} db @param {number} claseId */
+export function borrarClase(db, claseId) {
+  const c = uno(db, 'select anio_id from clase where id = ?', claseId);
+  if (!c) throw new ErrorValidacion('La clase no existe');
+  exigirAnioAbierto(db, c.anio_id);
+  db.prepare('delete from clase where id = ?').run(claseId);
+}

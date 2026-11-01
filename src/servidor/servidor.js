@@ -13,6 +13,7 @@ import {
   crearEstudiante, editarEstudiante, archivarEstudiante, listarEstudiantes,
   guardarNotas, listarNotas, desaprobadas, guardarNivelacion, pendientesNivelacion,
 } from '../servicios/academico.js';
+import * as PL from '../servicios/planeacion.js';
 import { crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
 import { exportarExcel, analizarExcel, importarExcel, ErrorImportacion } from '../excel/excel.js';
 
@@ -136,6 +137,24 @@ export function crearServidor(opciones) {
     { metodo: 'GET', patron: /^\/api\/nivelaciones\/pendientes$/, cuerpo: null, h: ({ q }) => ({
       json: pendientesNivelacion(bd(), { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), grado: entero(q.get('grado'), 'grado') }) }) },
     { metodo: 'PUT', patron: /^\/api\/nivelaciones$/, cuerpo: 'json', h: ({ b }) => { guardarNivelacion(bd(), b ?? {}); return { json: { ok: true } }; } },
+
+    // Planeación: planes, guías, temas con avance y clases
+    { metodo: 'GET', patron: /^\/api\/planes$/, cuerpo: null, h: ({ q }) => ({ json: PL.listarPlanes(bd(), { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), tipo: q.get('tipo') ?? undefined, materia_id: entero(q.get('materia_id'), 'materia_id'), grado: entero(q.get('grado'), 'grado') }) }) },
+    { metodo: 'PUT', patron: /^\/api\/planes$/, cuerpo: 'json', h: ({ b }) => ({ json: PL.guardarPlan(bd(), b ?? {}) }) },
+    { metodo: 'DELETE', patron: /^\/api\/planes\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarPlan(bd(), Number(p[0])); return { json: { ok: true } }; } },
+    { metodo: 'GET', patron: /^\/api\/guias$/, cuerpo: null, h: ({ q }) => ({ json: PL.listarGuias(bd(), { materia_id: entero(q.get('materia_id'), 'materia_id'), grado: entero(q.get('grado'), 'grado'), tema: q.get('tema') ?? undefined }) }) },
+    { metodo: 'PUT', patron: /^\/api\/guias$/, cuerpo: 'json', h: ({ b }) => ({ json: PL.guardarGuia(bd(), b ?? {}) }) },
+    { metodo: 'DELETE', patron: /^\/api\/guias\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarGuia(bd(), Number(p[0])); return { json: { ok: true } }; } },
+    { metodo: 'GET', patron: /^\/api\/temas$/, cuerpo: null, h: ({ q }) => {
+      const f = { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), materia_id: entero(q.get('materia_id'), 'materia_id'), grado: entero(q.get('grado'), 'grado') };
+      return { json: { temas: PL.listarTemas(bd(), { ...f, periodo: entero(q.get('periodo'), 'periodo') }), avance: PL.avanceTemas(bd(), f) } }; } },
+    { metodo: 'PUT', patron: /^\/api\/temas$/, cuerpo: 'json', h: ({ b }) => ({ json: PL.guardarTema(bd(), b ?? {}) }) },
+    { metodo: 'POST', patron: /^\/api\/temas\/(\d+)\/estado$/, cuerpo: 'json', h: ({ p, b }) => { PL.cambiarEstadoTema(bd(), Number(p[0]), b?.estado, b?.fecha); return { json: { ok: true } }; } },
+    { metodo: 'DELETE', patron: /^\/api\/temas\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarTema(bd(), Number(p[0])); return { json: { ok: true } }; } },
+    { metodo: 'GET', patron: /^\/api\/clases$/, cuerpo: null, h: ({ q }) => ({ json: PL.listarClases(bd(), { anio_id: enteroObligatorio(q.get('anio_id'), 'anio_id'), materia_id: entero(q.get('materia_id'), 'materia_id'), grado: entero(q.get('grado'), 'grado'), desde: q.get('desde') ?? undefined, hasta: q.get('hasta') ?? undefined }) }) },
+    { metodo: 'PUT', patron: /^\/api\/clases$/, cuerpo: 'json', h: ({ b }) => ({ json: PL.guardarClase(bd(), b ?? {}) }) },
+    { metodo: 'POST', patron: /^\/api\/clases\/(\d+)\/realizada$/, cuerpo: 'json', h: ({ p, b }) => { PL.marcarClase(bd(), Number(p[0]), b?.realizada !== false); return { json: { ok: true } }; } },
+    { metodo: 'DELETE', patron: /^\/api\/clases\/(\d+)$/, cuerpo: null, h: ({ p }) => { PL.borrarClase(bd(), Number(p[0])); return { json: { ok: true } }; } },
 
     { metodo: 'GET', patron: /^\/api\/respaldo$/, cuerpo: null, libre: true, h: () => ({
       json: ctx.carpetaCopias ? listarCopias(ctx.carpetaCopias).map((c) => ({ nombre: c.nombre, motivo: c.motivo })) : [] }) },

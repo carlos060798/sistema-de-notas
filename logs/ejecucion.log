@@ -17,3 +17,4 @@
 2026-10-31T21:35:29Z | F2 | aviso | Pendiente: adjuntos en respaldo/Excel (F4); revision independiente de rutas y Excel hostil; probar con volumen real
 2026-10-31T22:00:02Z | F3 | ok | Servidor local seguro, logica academica, pantallas y arranque: 96 pruebas pasan, tipos en 0; 5 mutaciones detectadas; probado en Edge real
 2026-10-31T22:00:03Z | F3 | aviso | Sin probar: ASUS/Windows 10, Chrome, botones de las pantallas distintas de Notas en navegador; revision independiente pendiente
+2026-11-01T00:55:23Z | F4 | ok | planeacion: planes, guias, temas/avance, clases; 105 pruebas; guias sin adjuntos (a validar)

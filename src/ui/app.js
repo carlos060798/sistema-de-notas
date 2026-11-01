@@ -80,7 +80,7 @@ async function cargarEstado() {
 // --- Navegación ---------------------------------------------------------------------------------
 
 const VISTAS = [
-  ['notas', 'Notas'], ['estudiantes', 'Estudiantes'], ['nivelacion', 'Nivelación'],
+  ['notas', 'Notas'], ['estudiantes', 'Estudiantes'], ['nivelacion', 'Nivelación'], ['planeacion', 'Planeación'],
   ['copias', 'Copias y Excel'], ['config', 'Año y materias'],
 ];
 
@@ -106,7 +106,7 @@ async function mostrar() {
         h('button', { class: 'principal', onclick: () => { vista = 'config'; mostrar(); } }, 'Ir a «Año y materias»')));
       return;
     }
-    await ({ notas: pantallaNotas, estudiantes: pantallaEstudiantes, nivelacion: pantallaNivelacion, copias: pantallaCopias, config: pantallaConfig })[vista](cont);
+    await ({ notas: pantallaNotas, estudiantes: pantallaEstudiantes, nivelacion: pantallaNivelacion, planeacion: pantallaPlaneacion, copias: pantallaCopias, config: pantallaConfig })[vista](cont);
   });
 }
 
@@ -306,7 +306,7 @@ function informeImportacion(datos, archivo) {
         h('tbody', {}, datos.errores.slice(0, 50).map((e) => h('tr', {}, h('td', {}, e.hoja), h('td', {}, e.fila || '—'), h('td', {}, e.columna ?? '—'), h('td', {}, e.mensaje))))));
     return salida;
   }
-  const nombres = { anio_lectivo: 'Años', grado: 'Grados', materia: 'Materias', estudiante: 'Estudiantes', matricula: 'Matrículas', nota: 'Notas', nivelacion: 'Nivelaciones', config: 'Configuración' };
+  const nombres = { anio_lectivo: 'Años', grado: 'Grados', materia: 'Materias', estudiante: 'Estudiantes', matricula: 'Matrículas', nota: 'Notas', nivelacion: 'Nivelaciones', config: 'Configuración', plan: 'Planes', guia: 'Guías', tema: 'Temas', clase: 'Clases' };
   salida.push(h('p', { class: 'etiqueta bien' }, 'El archivo es válido. Esto es lo que pasaría:'),
     h('table', {}, h('thead', {}, h('tr', {}, ['Tabla', 'Nuevos', 'Cambiados', 'Iguales'].map((t) => h('th', {}, t)))),
       h('tbody', {}, Object.entries(datos.resumen).map(([t, r]) => h('tr', {}, h('td', {}, nombres[t] ?? t), h('td', {}, r.nuevos), h('td', {}, r.cambiados), h('td', {}, r.iguales))))),
@@ -353,6 +353,96 @@ async function pantallaRecuperacion(cont) {
           if (confirm('¿Restaurar esta copia?')) intentar(async () => { await json('POST', '/api/recuperacion/restaurar', { nombre: c.nombre }); location.reload(); });
         } }, 'Restaurar'))))
       : h('p', {}, 'No hay copias sanas. Si tiene un Excel de respaldo, abra el programa en una carpeta nueva e impórtelo desde «Copias y Excel».')));
+}
+
+// --- Planeación: temas y avance, clases, planes y guías -------------------------------------------
+
+const SECCIONES_PLAN = [['temas', 'Temas y avance'], ['clases', 'Clases'], ['planes', 'Planes de área y aula'], ['guias', 'Guías']];
+const ESTADOS_TEMA = [['pendiente', 'Pendiente'], ['en_curso', 'En curso'], ['visto', 'Visto']];
+let seccionPlan = 'temas';
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+
+async function pantallaPlaneacion(cont) {
+  const barra = h('section', { class: 'tarjeta' }, h('h2', {}, 'Planeación'),
+    h('div', { class: 'fila' },
+      selector('Año', opcionesAnio(), sel.anio, (v) => { sel.anio = Number(v); mostrar(); }),
+      selector('Grado', opcionesGrado(), sel.grado, (v) => { sel.grado = Number(v); mostrar(); }),
+      selector('Materia', opcionesMateria(), sel.materia, (v) => { sel.materia = Number(v); mostrar(); })),
+    h('div', { class: 'fila' }, SECCIONES_PLAN.map(([id, t]) => h('button', { 'aria-current': id === seccionPlan ? 'true' : false, onclick: () => { seccionPlan = id; mostrar(); } }, t))));
+  const filtro = `anio_id=${sel.anio}&materia_id=${sel.materia}&grado=${sel.grado}`;
+  const cuerpo = await ({ temas: seccionTemas, clases: seccionClases, planes: seccionPlanes, guias: seccionGuias })[seccionPlan](filtro);
+  cont.replaceChildren(barra, cuerpo);
+}
+
+const baseCuerpo = () => ({ anio_id: sel.anio, materia_id: sel.materia, grado: sel.grado });
+const campoTexto = (etiqueta, max = 150) => { const i = h('input', { type: 'text', maxlength: max }); return [h('label', {}, etiqueta, i), i]; };
+const campoLargo = (etiqueta) => { const t = h('textarea', { maxlength: 20000 }); return [h('label', { class: 'ancha' }, etiqueta, t), t]; };
+
+async function seccionTemas(filtro) {
+  const r = await json('GET', `/api/temas?${filtro}`);
+  const [lNombre, nombre] = campoTexto('Nuevo tema');
+  const periodo = h('select', {}, [1, 2, 3, 4].map((p) => h('option', { value: p, selected: p === sel.periodo }, `Periodo ${p}`)));
+  return h('section', { class: 'tarjeta' },
+    h('h3', {}, `Avance: ${r.avance.vistos} de ${r.avance.total} temas vistos (${r.avance.porcentaje} %)`),
+    h('progress', { max: 100, value: r.avance.porcentaje, 'aria-label': 'Avance de temas' }),
+    h('div', { class: 'fila' }, lNombre, h('label', {}, 'Periodo', periodo),
+      h('button', { class: 'principal', onclick: () => intentar(async () => {
+        await json('PUT', '/api/temas', { ...baseCuerpo(), periodo: Number(periodo.value), nombre: nombre.value }); mostrar();
+      }) }, 'Agregar tema')),
+    r.temas.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Periodo', 'Tema', 'Estado', 'Fecha', ''].map((t) => h('th', {}, t)))),
+      h('tbody', {}, r.temas.map((t) => h('tr', {},
+        h('td', {}, t.periodo), h('td', {}, t.nombre),
+        h('td', {}, h('select', { 'aria-label': `Estado de ${t.nombre}`, onchange: (e) => intentar(async () => {
+          await json('POST', `/api/temas/${t.id}/estado`, { estado: e.target.value, fecha: hoyISO() }); mostrar();
+        }) }, ESTADOS_TEMA.map(([v, x]) => h('option', { value: v, selected: v === t.estado }, x)))),
+        h('td', {}, t.fecha_visto ?? '—'),
+        h('td', {}, h('button', { onclick: () => { if (confirm(`¿Quitar el tema «${t.nombre}»?`)) intentar(async () => { await json('DELETE', `/api/temas/${t.id}`); mostrar(); }); } }, 'Quitar'))))))
+      : h('p', { class: 'vacio' }, 'Aún no hay temas para esta materia y grado.'));
+}
+
+async function seccionClases(filtro) {
+  const [clases, temas] = await Promise.all([json('GET', `/api/clases?${filtro}`), json('GET', `/api/temas?${filtro}`)]);
+  const fecha = h('input', { type: 'date', value: hoyISO() });
+  const tema = h('select', {}, h('option', { value: '' }, '(sin tema)'), temas.temas.map((t) => h('option', { value: t.id }, t.nombre)));
+  const [lObj, obj] = campoLargo('Objetivo'); const [lAct, act] = campoLargo('Actividades'); const [lRec, rec] = campoLargo('Recursos');
+  return h('section', { class: 'tarjeta' }, h('h3', {}, 'Planear una clase'),
+    h('div', { class: 'fila' }, h('label', {}, 'Fecha', fecha), h('label', {}, 'Tema', tema)), lObj, lAct, lRec,
+    h('button', { class: 'principal', onclick: () => intentar(async () => {
+      await json('PUT', '/api/clases', { ...baseCuerpo(), fecha: fecha.value, tema_id: tema.value ? Number(tema.value) : null, objetivo: obj.value, actividades: act.value, recursos: rec.value });
+      aviso('Clase guardada'); mostrar();
+    }) }, 'Guardar clase'),
+    clases.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Fecha', 'Objetivo', 'Hecha', ''].map((t) => h('th', {}, t)))),
+      h('tbody', {}, clases.map((c) => h('tr', {}, h('td', {}, c.fecha), h('td', {}, c.objetivo || '—'),
+        h('td', {}, h('input', { type: 'checkbox', checked: !!c.realizada, 'aria-label': `Clase del ${c.fecha} realizada`, onchange: (e) => intentar(async () => { await json('POST', `/api/clases/${c.id}/realizada`, { realizada: e.target.checked }); }) })),
+        h('td', {}, h('button', { onclick: () => { if (confirm('¿Quitar esta clase?')) intentar(async () => { await json('DELETE', `/api/clases/${c.id}`); mostrar(); }); } }, 'Quitar'))))))
+      : h('p', { class: 'vacio' }, 'No hay clases planeadas.'));
+}
+
+async function seccionPlanes(filtro) {
+  const planes = await json('GET', `/api/planes?${filtro}`);
+  const tipo = h('select', {}, h('option', { value: 'area' }, 'Plan de área'), h('option', { value: 'aula' }, 'Plan de aula'));
+  const [lTit, tit] = campoTexto('Título'); const [lCon, con] = campoLargo('Contenido');
+  return h('section', { class: 'tarjeta' }, h('h3', {}, 'Nuevo plan'),
+    h('div', { class: 'fila' }, h('label', {}, 'Tipo', tipo), lTit), lCon,
+    h('button', { class: 'principal', onclick: () => intentar(async () => {
+      await json('PUT', '/api/planes', { ...baseCuerpo(), tipo: tipo.value, titulo: tit.value, contenido: con.value }); aviso('Plan guardado'); mostrar();
+    }) }, 'Guardar plan'),
+    ...planes.map((p) => h('details', {}, h('summary', {}, `${p.tipo === 'area' ? 'Área' : 'Aula'} — ${p.titulo}`),
+      h('pre', { class: 'texto' }, p.contenido),
+      h('button', { onclick: () => { if (confirm(`¿Quitar el plan «${p.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/planes/${p.id}`); mostrar(); }); } }, 'Quitar'))));
+}
+
+async function seccionGuias() {
+  const guias = await json('GET', `/api/guias?materia_id=${sel.materia}&grado=${sel.grado}`);
+  const [lTema, tema] = campoTexto('Tema'); const [lTit, tit] = campoTexto('Título'); const [lCon, con] = campoLargo('Contenido de la guía');
+  return h('section', { class: 'tarjeta' }, h('h3', {}, 'Nueva guía (sirve para todos los años)'),
+    h('div', { class: 'fila' }, lTema, lTit), lCon,
+    h('button', { class: 'principal', onclick: () => intentar(async () => {
+      await json('PUT', '/api/guias', { materia_id: sel.materia, grado: sel.grado, tema: tema.value, titulo: tit.value, contenido: con.value }); aviso('Guía guardada'); mostrar();
+    }) }, 'Guardar guía'),
+    ...guias.map((g) => h('details', {}, h('summary', {}, `${g.tema ? g.tema + ' — ' : ''}${g.titulo}`),
+      h('pre', { class: 'texto' }, g.contenido),
+      h('button', { onclick: () => { if (confirm(`¿Quitar la guía «${g.titulo}»?`)) intentar(async () => { await json('DELETE', `/api/guias/${g.id}`); mostrar(); }); } }, 'Quitar'))));
 }
 
 // --- Arranque -----------------------------------------------------------------------------------
