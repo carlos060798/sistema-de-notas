@@ -131,7 +131,11 @@ async function pantallaNotas(cont) {
   const tabla = filas.length
     ? h('table', {}, h('thead', {}, h('tr', {}, ['Estudiante', 'Nota 1', 'Nota 2', 'Nota 3', 'Definitiva del periodo', 'Estado', 'Definitiva del año'].map((t) => h('th', {}, t)))), cuerpo)
     : h('p', { class: 'vacio' }, 'No hay estudiantes en este grado. Agréguelos en «Estudiantes».');
+  const planilla = `/api/reportes/planilla?anio_id=${sel.anio}&grado=${sel.grado}&materia_id=${sel.materia}`;
   cont.replaceChildren(filtros, h('section', { class: 'tarjeta' }, tabla, resumen,
+    h('div', { class: 'fila-acciones' }, h('span', {}, 'Planilla de esta materia:'),
+      h('button', { class: 'secundario', onclick: () => descargarDocumento(planilla + '&formato=xlsx') }, 'Excel'),
+      h('button', { class: 'secundario', onclick: () => descargarDocumento(planilla + '&formato=pdf') }, 'PDF')),
     h('p', { class: 'suave' }, 'Escriba la nota y presione Tab o Enter. Se guarda sola. Puede usar coma o punto (4,5). La escala es de 1,0 a 5,0 y se aprueba con 3,0.')));
 }
 
@@ -147,13 +151,17 @@ function filaNotas(f, alCambiarResumen) {
     tr.className = f.aprobado === false ? 'reprobado' : '';
   };
   pintar();
-  const guardar = async () => {
-    const valores = entradas.map((e) => leerNota(e.value));
+  // Los guardados de una fila van en cola: así el último valor escrito es siempre el que queda en la base.
+  let cola = Promise.resolve();
+  const guardar = () => { cola = cola.then(guardarAhora); return cola; };
+  const guardarAhora = async () => {
+    const textos = entradas.map((e) => e.value);
+    const valores = textos.map((t) => leerNota(t));
     if (valores.some((v) => Number.isNaN(v))) { aviso('Escriba solo números, por ejemplo 4,5', true); return; }
     await intentar(async () => {
       const r = await json('PUT', '/api/notas', { matricula_id: f.matricula_id, materia_id: sel.materia, periodo: sel.periodo, n1: valores[0], n2: valores[1], n3: valores[2] });
       f.n1 = valores[0]; f.n2 = valores[1]; f.n3 = valores[2]; f.definitiva = r.definitiva; f.aprobado = r.aprobado;
-      entradas.forEach((e, i) => { e.value = fmt2(valores[i]); });
+      entradas.forEach((e, i) => { if (e.value === textos[i]) e.value = fmt2(valores[i]); }); // no pisar lo escrito mientras se guardaba
       const datos = await json('GET', `/api/notas?anio_id=${sel.anio}&grado=${sel.grado}&materia_id=${sel.materia}&periodo=${sel.periodo}`);
       f.anio = datos.find((d) => d.matricula_id === f.matricula_id).anio;
       pintar(); alCambiarResumen(); aviso('Guardado');
@@ -213,7 +221,10 @@ function filaEstudiante(x) {
           h('button', { class: 'secundario', onclick: () => intentar(async () => {
             await json('POST', `/api/estudiantes/${x.estudiante_id}/archivar`, { archivar: !!x.activo });
             aviso(x.activo ? 'Archivado: sus notas se conservan' : 'Restaurado'); mostrar();
-          }) }, x.activo ? 'Archivar' : 'Reactivar')));
+          }) }, x.activo ? 'Archivar' : 'Reactivar'), ' ',
+          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/boletin?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=pdf`) }, 'Boletín PDF'), ' ',
+          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/boletin?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=docx`) }, 'Boletín Word'), ' ',
+          h('button', { class: 'secundario', onclick: () => descargarDocumento(`/api/reportes/certificado?anio_id=${sel.anio}&matricula_id=${x.matricula_id}&formato=pdf`) }, 'Certificado')));
     }
   };
   pintar(false);
@@ -249,6 +260,18 @@ async function pantallaNivelacion(cont) {
 }
 
 // --- Copias y Excel -----------------------------------------------------------------------------
+
+/** Descarga un documento del programa (planilla, boletín, certificado). */
+async function descargarDocumento(ruta) {
+  await intentar(async () => {
+    const r = await api('GET', ruta);
+    const nombre = decodeURIComponent(/filename\*=UTF-8''(.+)$/.exec(r.headers.get('content-disposition') ?? '')?.[1] ?? 'documento');
+    const url = URL.createObjectURL(await r.blob());
+    const enlace = h('a', { href: url, download: nombre }); document.body.append(enlace); enlace.click(); enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    aviso('Descargado: ' + nombre);
+  });
+}
 
 async function descargarExcel() {
   await intentar(async () => {

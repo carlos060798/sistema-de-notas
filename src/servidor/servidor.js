@@ -15,6 +15,8 @@ import {
 } from '../servicios/academico.js';
 import * as PL from '../servicios/planeacion.js';
 import { crearCopia, listarCopias, verificarCopia, restaurar } from '../respaldo/respaldo.js';
+import { datosPlanilla, datosBoletin } from '../reportes/datos.js';
+import * as FM from '../reportes/formatos.js';
 import { exportarExcel, analizarExcel, importarExcel, ErrorImportacion } from '../excel/excel.js';
 
 const LIMITE_JSON = 1_000_000;
@@ -177,6 +179,25 @@ export function crearServidor(opciones) {
           'content-disposition': `attachment; filename="respaldo-notas-${hoy()}.xlsx"` } };
       } finally { fs.rmSync(tmp, { force: true }); }
     } },
+    // Documentos: planilla (xlsx|pdf), boletín y certificado (pdf|docx)
+    { metodo: 'GET', patron: /^\/api\/reportes\/(planilla|boletin|certificado)$/, cuerpo: null, h: async ({ p, q }) => {
+      const tipo = p[0]; const formato = q.get('formato') ?? '';
+      const permitidos = { planilla: ['xlsx', 'pdf'], boletin: ['pdf', 'docx'], certificado: ['pdf', 'docx'] }[tipo] ?? [];
+      if (!permitidos.includes(formato)) throw new ErrorValidacion(`El formato debe ser ${permitidos.join(' o ')}`);
+      const anio_id = enteroObligatorio(q.get('anio_id'), 'anio_id');
+      const datos = tipo === 'planilla'
+        ? datosPlanilla(bd(), { anio_id, grado: enteroObligatorio(q.get('grado'), 'grado'), materia_id: enteroObligatorio(q.get('materia_id'), 'materia_id') })
+        : datosBoletin(bd(), { anio_id, matricula_id: enteroObligatorio(q.get('matricula_id'), 'matricula_id') });
+      const dibujar = /** @type {Record<string, Function>} */ ({ 'planilla.xlsx': FM.planillaExcel, 'planilla.pdf': FM.planillaPdf, 'boletin.pdf': FM.boletinPdf, 'boletin.docx': FM.boletinDocx, 'certificado.pdf': FM.certificadoPdf, 'certificado.docx': FM.certificadoDocx })[tipo + '.' + formato];
+      const tmp = path.join(os.tmpdir(), `notas-doc-${crypto.randomUUID()}.${formato}`);
+      const tipos = { xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+      try {
+        await dibujar(datos, tmp);
+        const nombre = encodeURIComponent(`${tipo}-${(/** @type {any} */ (datos).estudiante ?? /** @type {any} */ (datos).materia).replace(/\s+/g, '-')}-${/** @type {any} */ (datos).anio}.${formato}`);
+        return { raw: fs.readFileSync(tmp), headers: { 'content-type': /** @type {Record<string, string>} */ (tipos)[formato], 'content-disposition': `attachment; filename*=UTF-8''${nombre}` } };
+      } finally { fs.rmSync(tmp, { force: true }); }
+    } },
+
     { metodo: 'POST', patron: /^\/api\/excel\/analizar$/, cuerpo: 'raw', h: ({ b }) => conArchivo(b, async (f) => ({ json: await analizarExcel(bd(), f) })) },
     { metodo: 'POST', patron: /^\/api\/excel\/importar$/, cuerpo: 'raw', h: ({ q, b }) => conArchivo(b, async (f) => {
       const confirmar = q.get('confirmar') === '1';
