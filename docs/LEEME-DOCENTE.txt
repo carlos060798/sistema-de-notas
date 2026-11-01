@@ -1,0 +1,19 @@
+SISTEMA DE NOTAS - Instrucciones
+
+1. Descomprima esta carpeta donde quiera (por ejemplo, en Documentos o en una memoria USB).
+2. Haga doble clic en notas.exe. Se abre una ventana con el programa.
+   Si Windows muestra «Windows protegió su PC», elija «Más información» y luego «Ejecutar de todas formas».
+3. La primera vez cree el año lectivo y las materias en «Año y materias».
+
+DONDE QUEDAN SUS DATOS
+- En la carpeta «datos», junto a notas.exe. Todo es local: no usa internet.
+- El programa hace una copia sola al abrir y al cerrar (carpeta «datos\copias»).
+
+CUIDE SUS DATOS
+- Entre a «Copias y Excel» y descargue el Excel de respaldo cada semana; guárdelo también en una memoria USB.
+- Con ese Excel se puede recuperar todo en otro computador.
+- Para cambiar de computador, copie la carpeta completa (notas.exe y datos).
+
+SI ALGO FALLA
+- Si el programa dice que la base está dañada, ofrece restaurar la última copia sana. Elíjala.
+- No abra el programa dos veces a la vez.

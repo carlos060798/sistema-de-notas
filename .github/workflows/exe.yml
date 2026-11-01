@@ -1,0 +1,38 @@
+# Construye notas.exe en Windows, lo prueba y lo publica. El docente solo descarga el .zip.
+name: Construir notas.exe
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+        env: { NOTAS_SIN_UI: '1' }
+      - run: node scripts/empaquetar.mjs
+      - run: node scripts/humo-exe.mjs dist/notas.exe
+      - name: Armar el paquete para el docente
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/paquete | Out-Null
+          Copy-Item dist/notas.exe dist/paquete/
+          Copy-Item docs/LEEME-DOCENTE.txt dist/paquete/LEEME.txt
+          Compress-Archive -Path dist/paquete/* -DestinationPath dist/sistema-de-notas-windows.zip -Force
+      - uses: actions/upload-artifact@v4
+        with: { name: sistema-de-notas-windows, path: dist/sistema-de-notas-windows.zip }
+      - name: Publicar en Releases (solo con etiqueta v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: gh release create "${{ github.ref_name }}" dist/sistema-de-notas-windows.zip --title "${{ github.ref_name }}" --notes "Descargue el .zip, descomprímalo y abra notas.exe. Lea LEEME.txt."
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }

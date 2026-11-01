@@ -44,7 +44,7 @@ async function respondiendo(url) {
 }
 
 /**
- * @param {{ carpetaDatos: string, abrirVentana?: boolean, retencion?: number, latidoMaxMs?: number, revisarCadaMs?: number }} o
+ * @param {{ carpetaDatos: string, abrirVentana?: boolean, retencion?: number, leerRecurso?: (nombre: string) => Buffer, latidoMaxMs?: number, revisarCadaMs?: number }} o
  * @returns {Promise<{ url: string, token: string, yaEstabaAbierta: boolean, modo: 'ok' | 'recuperacion', cerrar: () => Promise<void> }>}
  */
 export async function iniciar(o) {
@@ -76,6 +76,7 @@ export async function iniciar(o) {
     db, rutaBase, carpetaCopias,
     modo: diag.estado === 'danada' ? 'recuperacion' : 'ok',
     motivoDano: diag.estado === 'danada' ? diag.motivo : null,
+    leerRecurso: o.leerRecurso,
   });
   const { url } = await servidor.escuchar();
   fs.writeFileSync(rutaLock, JSON.stringify({ url, pid: process.pid }));

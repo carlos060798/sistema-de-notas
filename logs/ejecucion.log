@@ -19,3 +19,4 @@
 2026-10-31T22:00:03Z | F3 | aviso | Sin probar: ASUS/Windows 10, Chrome, botones de las pantallas distintas de Notas en navegador; revision independiente pendiente
 2026-11-01T00:55:23Z | F4 | ok | planeacion: planes, guias, temas/avance, clases; 104 pruebas; guias sin adjuntos (a validar)
 2026-11-01T01:03:36Z | F5 | ok | documentos: planilla xlsx/pdf, boletin y certificado pdf/docx; 110 pruebas; corregida carrera de guardado en UI
+2026-11-01T01:10:32Z | F6 | aviso | empaquetado OK local (exe 96MB, 77MB RAM, humo OK); CI sin ejecutar; revision independiente pendiente

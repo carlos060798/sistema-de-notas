@@ -37,7 +37,7 @@
 - [~] **T5.3** Planes y guías a Word y PDF. Cubre CA-004-04, CA-005-03. (parcial: planes y guías aún sin exportar a Word/PDF)
 
 ## F6 Empaquetado y cierre
-- [ ] **T6.1** `esbuild` + SEA + GitHub Actions que publica el `.exe`.
+- [x] **T6.1** `esbuild` + SEA + GitHub Actions que publica el `.exe`.
 - [ ] **T6.2** Prueba en el ASUS con Windows 10: arranque, memoria, restauración.
 - [ ] **T6.3** Prueba visual de PDF y Word.
 - [ ] **T6.4** Revisión independiente, suite completa, `verificacion.md`.

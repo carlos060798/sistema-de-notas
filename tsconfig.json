@@ -11,5 +11,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*.js", "tests/**/*.js"],
-  "exclude": ["src/ui"]
+  "exclude": ["src/ui", "src/main-exe.js"]
 }
