@@ -27,9 +27,9 @@
 - [x] **T3.6** Arranque: instancia única, copia al abrir y al cerrar, apagado al cerrar la ventana, apertura en ventana de aplicación. Cubre CA-007-01. Hecho 2026-10-31.
 
 ## F4 Planes, guías y avance
-- [ ] **T4.1** Plan de área y plan de aula. Cubre CA-004-01 a 03.
-- [ ] **T4.2** Guías con adjuntos en `datos/`. Cubre CA-005-01, 02, RF-005.
-- [ ] **T4.3** Temas, avance y clases. Cubre CA-006-01 a 04.
+- [x] **T4.1** Plan de área y plan de aula. Cubre CA-004-01 a 03.
+- [~] **T4.2** Guías con adjuntos en `datos/`. Cubre CA-005-01, 02, RF-005. (parcial: guías como texto, sin adjuntos; a validar con el docente)
+- [x] **T4.3** Temas, avance y clases. Cubre CA-006-01 a 04.
 
 ## F5 Reportes
 - [ ] **T5.1** Planilla en `.xlsx` y `.pdf`. Cubre CA-009-01.
