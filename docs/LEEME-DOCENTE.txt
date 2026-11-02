@@ -1,21 +1,38 @@
 SISTEMA DE NOTAS - Instrucciones
 
-1. Descomprima esta carpeta donde quiera (por ejemplo, en Documentos o en una memoria USB).
+QUE NECESITA
+- Un computador con Windows 10 (64 bits) o Windows 11, y Microsoft Edge o Google Chrome (Edge ya viene con Windows).
+- No hay que instalar nada más: ni Node, ni internet. Todo viene dentro de notas.exe.
+- Para abrir lo que el programa genera: PDF (Edge lo abre solo), Word (.docx) y Excel (.xlsx) con Word y Excel o programas parecidos como LibreOffice.
+
+COMO EMPEZAR
+1. Descomprima esta carpeta en un lugar donde pueda escribir, por ejemplo C:\SistemaDeNotas o una memoria USB.
+   IMPORTANTE: NO la ponga dentro de OneDrive (a veces el Escritorio y Documentos se sincronizan con OneDrive y eso puede dañar la base de datos).
 2. Haga doble clic en notas.exe. Se abre una ventana con el programa.
    Si Windows muestra «Windows protegió su PC», elija «Más información» y luego «Ejecutar de todas formas».
-3. La primera vez cree el año lectivo y las materias en «Año y materias».
+   (Sale porque el programa es nuevo y no tiene firma digital; no es un virus. Si su antivirus lo marca, agréguelo como excepción.)
+3. La primera vez, en «Año y materias»: cree el año lectivo, las materias (y marque en qué grados se dicta cada una) y escriba los datos de la escuela.
+4. Después agregue a los estudiantes en «Estudiantes» y empiece a poner notas en «Notas».
 
 DONDE QUEDAN SUS DATOS
 - En la carpeta «datos», junto a notas.exe. Todo es local: no usa internet.
 - El programa hace una copia sola al abrir y al cerrar (carpeta «datos\copias»).
 
 CUIDE SUS DATOS
-- Entre a «Copias y Excel» y descargue el Excel de respaldo cada semana; guárdelo también en una memoria USB.
+- Entre a «Respaldo» y descargue el Excel de respaldo cada semana; guárdelo también en una memoria USB. La pantalla «Hoy» le avisa si pasan dos semanas sin hacerlo.
 - Con ese Excel se recuperan sus estudiantes, notas, planes, guías (el texto), temas, clases y asistencia en otro computador.
 - OJO: el Excel NO guarda los archivos adjuntos de las guías (PDF, imágenes...). Para esos, use también «Descargar copia completa» y guárdela en la memoria USB.
 - En «Respaldo» puede escribir la carpeta de su memoria USB (por ejemplo E:\Respaldos): al cerrar el programa se guardará allí una copia sola.
 - Para cambiar de computador, copie la carpeta completa (notas.exe y datos).
 
+AL CERRAR
+- Cierre la ventana del programa. El programa se apaga solo en 2 o 3 minutos y entonces hace la copia «al cerrar».
+- No apague el computador justo después de cerrar la ventana: espere esos minutos. (Si lo apaga antes, queda igual la copia que se hizo al abrir.)
+
 SI ALGO FALLA
 - Si el programa dice que la base está dañada, ofrece restaurar la última copia sana. Elíjala.
-- No abra el programa dos veces a la vez.
+- No abra el programa dos veces a la vez: si lo intenta, se abre la ventana del que ya está corriendo.
+- Si algo no funciona, anote qué estaba haciendo y qué mensaje salió, y avise a quien le entregó el programa.
+
+HOJA-DE-VALIDACION.txt
+- Es una lista de preguntas sobre cómo califica usted (redondeo, nivelación, certificado...). Sirve para ajustar el programa a su forma de trabajar.
